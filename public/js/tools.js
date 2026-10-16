@@ -146,7 +146,10 @@ export function drawPortfolio() {
   const bar = el('div', 'pf-bar'); const total = s.valueSol || 1;
   s.holdings.forEach((h, i) => { const seg = el('span', `seg c${i % 6} w${Math.max(1, Math.min(20, Math.round(h.valueSol / total * 20)))}`); seg.title = `${h.symbol}: ${h.valueSol.toFixed(4)} SOL`; bar.append(seg); });
   const list = el('ul', 'pf-list'); for (const [i, h] of s.holdings.entries()) { const li = el('li'), dot = el('i', `c${i % 6}`); li.append(dot, el('span', '', h.symbol), el('span', '', `${h.valueSol.toFixed(4)} SOL`), el('span', h.pnlPct === null ? '' : h.pnlPct >= 0 ? 'up' : 'down', h.pnlPct === null ? 'no price yet' : pct(h.pnlPct))); list.append(li); }
-  box.replaceChildren(grid, ...(s.holdings.length ? [bar, list] : [el('p', 'small', 'No coins held right now. Holdings, their share of the portfolio and their live profit show here.')]));
+  const recent = state.trades.filter((t) => t.mode === state.mode).slice(-6).reverse(), rl = el('ul', 'pf-list recent');
+  for (const t of recent) { const li = el('li'), b = el('button', 'sell', 'Receipt'); b.type = 'button'; b.addEventListener('click', () => emit('receipt', t)); li.append(el('i', t.pnlSol >= 0 ? 'win' : 'loss'), el('span', '', `${t.symbol}${t.partial ? ' (part)' : ''}`), el('span', t.pnlSol >= 0 ? 'up' : 'down', `${t.pnlSol >= 0 ? '+' : ''}${t.pnlSol.toFixed(4)}`), b); rl.append(li); }
+  const recentBlock = recent.length ? [el('h3', 'label sub', 'RECENT TRADES · HONEST RECEIPTS'), rl] : [];
+  box.replaceChildren(grid, ...recentBlock, ...(s.holdings.length ? [bar, list] : [el('p', 'small', 'No coins held right now. Holdings, their share of the portfolio and their live profit show here.')]));
 }
 on('trade', () => { drawPortfolio(); drawOrders(); }); on('equity', drawPortfolio); on('synced', () => { drawPortfolio(); drawOrders(); });
 drawOrders(); drawPortfolio();

@@ -4,7 +4,9 @@ import { sync, syncNow } from './sync.js';
 import { drawOrders, drawPortfolio } from './tools.js';
 import { vault, owner, connectPhantom, disconnectPhantom, reconnectPhantom, fundFromPhantom, withdraw, liveBalance } from './wallet.js';
 import { AGENTS, impi, start, stop, peek, rules } from './impi.js';
-import { sell, sellAll, balance, heldSol } from './trader.js';
+import { sell, sellAll, balance, heldSol, writeOff } from './trader.js';
+import { receipt } from '/vendor/lib/receipt.js';
+import { validateBedtime, bedtimeText } from '/vendor/lib/mood.js';
 import { startNet, setData } from './net.js';
 import { rebasePosition } from '/vendor/lib/strategy.js';
 /** As in Laugh: open positions take the new strength's stop and target at once. A stop that has already moved up to the price paid or above is kept. */
@@ -91,7 +93,8 @@ async function drawMoney() {
     const mins = Math.round((Date.now() - p.openedAt) / 60000);
     tr.append(el('td'), el('td', '', p.solIn.toFixed(4)), el('td', '', now.toFixed(4)), el('td', g >= 0 ? 'up' : 'down', pct(g)), span, el('td', '', `${mins}m`), el('td', '', ''));
     // labels for the phone layout, where each position is a stacked card
-    ['', 'In', 'Now', 'P/L', 'Stop · price · target', 'Held', ''].forEach((l, k) => { tr.children[k].dataset.l = l; }); tr.firstChild.append(name); if (p.empty) tr.firstChild.append(el('span', 'tagx', 'POOL EMPTY')); const m = el('button', 'sell', 'Manage'); m.type = 'button'; m.addEventListener('click', () => emit('position-tools', p)); tr.lastChild.append(m, b); if (p.ownStop || p.ownTarget) tr.firstChild.append(el('span', 'tagx mine', 'MY EXITS')); return tr; })
+    ['', 'In', 'Now', 'P/L', 'Stop · price · target', 'Held', ''].forEach((l, k) => { tr.children[k].dataset.l = l; }); tr.firstChild.append(name); if (p.empty) tr.firstChild.append(el('span', 'tagx', 'POOL EMPTY')); const m = el('button', 'sell', 'Manage'); m.type = 'button'; m.addEventListener('click', () => emit('position-tools', p));
+    if (p.empty) { const w = el('button', 'sell', 'Write off'); w.type = 'button'; let armedW = 0; w.addEventListener('click', () => { if (Date.now() - armedW > 5000) { armedW = Date.now(); w.textContent = 'Tap again: record it as lost'; return; } writeOff(p); void drawMoney(); }); tr.lastChild.append(w); } else tr.lastChild.append(m, b); if (p.ownStop || p.ownTarget) tr.firstChild.append(el('span', 'tagx mine', 'MY EXITS')); return tr; })
     : [(() => { const tr = el('tr'), td = el('td', 'small', 'Nothing open. The impi buys only in the strike zone.'); td.colSpan = 7; tr.append(td); return tr; })()]));
 }
 on('equity', drawMoney); on('positions', drawMoney); on('trade', drawMoney); setInterval(() => { if (state.positions.length) void drawMoney(); }, 15_000);
@@ -126,6 +129,14 @@ $('csv').addEventListener('click', () => {
   const rows = [['closed_at_utc', 'mode', 'coin', 'kind', 'sol_in', 'sol_out', 'result_sol', 'result_pct', 'why_closed', 'part_sale', 'opened_at_utc', 'minutes_held', 'rules_version', 'round_trip_cost_pct', 'coin_address'], ...state.trades.map((t) => [new Date(t.closedAt).toISOString(), t.mode === 'live' ? 'live' : 'practice', t.symbol, t.style ?? '', t.solIn.toFixed(6), t.solOut.toFixed(6), t.pnlSol.toFixed(6), t.pnlPct.toFixed(2), t.reason, t.partial ? 'yes' : 'no', t.openedAt ? new Date(t.openedAt).toISOString() : '', t.openedAt ? ((t.closedAt - t.openedAt) / 60000).toFixed(1) : '', t.rules ?? '', Number.isFinite(t.costPct) ? t.costPct.toFixed(2) : '', t.mint])];
   const csv = rows.map((r) => r.map((v) => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v)).join(',')).join('\n'), a = el('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `warrior-trades-${new Date().toISOString().slice(0, 10)}.csv`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+// Reset the day (from Laugh): today's loss count starts again from what the wallet is worth now. A second tap confirms.
+let dayArmed = 0;
+$('reset-day').addEventListener('click', async () => {
+  if (Date.now() - dayArmed > 6000) { dayArmed = Date.now(); $('reset-day').textContent = 'Tap again: start today from now'; setTimeout(() => { $('reset-day').textContent = 'Reset the day'; }, 6000); return; }
+  let eq = 0; try { eq = (await balance()) + heldSol(); } catch { return; }
+  state.days ??= {}; state.days[state.mode] = { day: new Date().toISOString().slice(0, 10), start: eq }; save(); $('reset-day').textContent = 'Reset the day';
+  emit('say', { who: 'induna', text: `The day starts again from ${eq.toFixed(4)} SOL. The daily loss limit counts from here.` });
 });
 $('reset').addEventListener('click', () => {
   if (impi.running || state.mode !== 'paper') { emit('say', { who: 'umlobi', text: 'Practice can be reset in practice mode, with the impi resting.' }); return; }
@@ -193,6 +204,42 @@ $('pause-after').addEventListener('change', () => { state.pauseAfter = Number($(
 let scoreArmed = 0;
 $('score-reset').addEventListener('click', () => { if (Date.now() - scoreArmed > 5000) { scoreArmed = Date.now(); $('score-reset').textContent = 'Tap again to reset'; setTimeout(() => { $('score-reset').textContent = 'Reset scorecard'; }, 5000); return; } resetBooks(); $('score-reset').textContent = 'Reset scorecard'; });
 on('shadow', drawScore); on('synced', drawScore); drawScore();
+
+// ---------- care: bedtime and the sweep (from Laugh) ----------
+function drawCare() {
+  const b = { on: false, stopAt: '23:00', closeAt: '', wakeAt: '07:00', ...(state.bedtime ?? {}) }, w = { on: false, to: '', keepSol: 0.2, ...(state.sweep ?? {}) };
+  $('bed-on').checked = !!b.on; $('bed-stop').value = b.stopAt; $('bed-close').value = b.closeAt ?? ''; $('bed-wake').value = b.wakeAt; $('bed-text').textContent = bedtimeText(b);
+  $('sweep-on').checked = !!w.on; $('sweep-to').value = w.to || owner.address || ''; $('sweep-keep').value = String(w.keepSol);
+  $('sweep-text').textContent = w.on ? `After each whole live sale, with nothing left open, anything above ${w.keepSol} SOL goes to ${w.to.slice(0, 4)}…${w.to.slice(-4)}.` : 'Off. Profits stay in the trading wallet until you send them yourself.';
+}
+$('bed-save').addEventListener('click', () => {
+  const next = { on: $('bed-on').checked, stopAt: $('bed-stop').value, closeAt: $('bed-close').value || null, wakeAt: $('bed-wake').value };
+  if (next.on) { const v = validateBedtime(next); if (!v.ok) { $('bed-text').textContent = `${v.reasons.join('. ')}.`; return; } }
+  state.bedtime = next; save(); drawCare(); emit('say', { who: 'induna', text: bedtimeText(next) });
+});
+$('sweep-save').addEventListener('click', () => {
+  const to = $('sweep-to').value.trim(), keep = Number($('sweep-keep').value), on = $('sweep-on').checked;
+  if (on && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(to)) { $('sweep-text').textContent = 'That is not a Solana address.'; return; }
+  if (on && to === vault.address) { $('sweep-text').textContent = 'That is the trading wallet itself. Choose your Phantom address.'; return; }
+  if (!(keep >= 0.05 && keep <= 100)) { $('sweep-text').textContent = 'Keep 0.05 to 100 SOL to trade with.'; return; }
+  state.sweep = { on, to, keepSol: keep }; save(); drawCare();
+  emit('say', { who: 'umlobi', text: on ? `Sweep on: anything above ${keep} SOL goes to your address after each whole live sale, when nothing is open.` : 'Sweep off.' });
+});
+on('synced', drawCare); on('wallet', drawCare); drawCare();
+
+// ---------- the honest receipt (from Laugh) ----------
+export function showReceipt(t) {
+  const r = receipt(t), body = $('dlg-body'), table = el('div', 'receipt');
+  $('dlg-title').textContent = 'Honest receipt';
+  const meta = el('p', 'small', `${t.symbol} · closed ${new Date(t.closedAt).toLocaleString()} · ${t.reason}${t.partial ? ' (part)' : ''} · rules ${t.rules ?? '—'} · ${t.mode === 'live' ? 'live' : 'practice'}`);
+  for (const l of r.lines) { const row = el('div', `rline ${l.kind ?? ''}`), left = el('div'); left.append(el('b', '', l.label)); if (l.note) left.append(el('span', '', l.note)); row.append(left, el('div', 'rsol', l.text)); table.append(row); }
+  const tot = el('div', 'rline total'); tot.append(el('b', '', 'Costs you paid, in total'), el('div', 'rsol', `${r.costsSol?.toFixed(6) ?? '—'} SOL`));
+  const res = el('div', `rline total ${r.resultSol >= 0 ? 'up' : 'down'}`); res.append(el('b', '', 'True result'), el('div', 'rsol', `${r.resultSol >= 0 ? '+' : '−'}${Math.abs(r.resultSol).toFixed(6)} SOL (${r.resultPct >= 0 ? '+' : ''}${r.resultPct.toFixed(2)}%)`));
+  table.append(tot, res);
+  const extra = []; if (t.exit && !['practice', 'none'].includes(t.exit)) { const a = el('a', 'small', 'See the sale on Solscan'); a.href = `https://solscan.io/tx/${t.exit}`; a.target = '_blank'; a.rel = 'noopener'; extra.push(a); }
+  body.replaceChildren(meta, table, el('p', 'small', r.note), ...extra); $('dlg-status').textContent = ''; $('dlg-go').hidden = true; dlg.showModal();
+}
+on('receipt', showReceipt);
 
 // ---------- dark mode ----------
 function drawTheme() { const d = document.documentElement.dataset.theme === 'dark'; $('theme').setAttribute('aria-pressed', String(d)); $('theme').querySelector('.tt-l').textContent = d ? 'DARK' : 'LIGHT'; document.querySelector('meta[name=theme-color]').content = d ? '#120d1a' : '#fff8ec'; }

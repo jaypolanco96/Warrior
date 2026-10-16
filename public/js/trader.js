@@ -1,8 +1,9 @@
 // The trader: buys, sells and watches positions for the impi, in practice (pretend SOL, real quotes) or live (the trading
 // wallet, real swaps through Jupiter). Every live transaction is checked before it is signed: it must be paid by the
 // trading wallet, need no other signature, and call only the programs a Jupiter swap uses.
-import { VersionedTransaction, Transaction, TransactionInstruction, PublicKey } from '/vendor/solana.js';
-import { unexpectedPrograms, closableAccounts, CLOSE_ACCOUNT_DATA } from '/vendor/lib/vault.js';
+import { VersionedTransaction, Transaction, TransactionInstruction, PublicKey, SystemProgram } from '/vendor/solana.js';
+import { unexpectedPrograms, closableAccounts, CLOSE_ACCOUNT_DATA, sweepLamports } from '/vendor/lib/vault.js';
+import { entryCosts, addEntryCosts, shareOf } from '/vendor/lib/receipt.js';
 import { positionSize } from '/vendor/lib/risk.js';
 import { partialDue, autoExitDue, ownExitDue, confirm, poolEmptied } from '/vendor/lib/orders.js';
 import { state, save, api, post, SOL, emit, dials } from './store.js';
@@ -18,9 +19,11 @@ const usd = (n) => !Number.isFinite(n) ? '—' : n >= 1e6 ? `$${(n / 1e6).toFixe
 const pctx = (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
 const b64 = (bytes) => btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''));
 const mine = () => state.positions.filter((p) => p.mode === state.mode);
+// Positions that can still be sold. One whose pool was emptied is worth nothing: it uses no slot and adds nothing to equity.
+export const sellable = () => mine().filter((p) => !p.empty);
 
 export async function balance() { return live() ? liveBalance() : state.paperSol; }
-export function heldSol() { return mine().reduce((n, p) => n + (Number.isFinite(p.nowSol) ? p.nowSol : p.solIn), 0); }
+export function heldSol() { return sellable().reduce((n, p) => n + (Number.isFinite(p.nowSol) ? p.nowSol : p.solIn), 0); }
 async function tokenRaw(mint) { return BigInt((await api(`/api/balance?owner=${vault.address}&mint=${mint}`)).tokenRaw ?? '0'); }
 
 async function swap(quoteResponse, exit) {
@@ -45,9 +48,9 @@ export async function buy(t, rules) {
   talk('inhloli', `${t.symbol}: ${pctx(t.change?.m5 ?? 0)} in 5 minutes, ${pctx(t.change?.h1 ?? 0)} over the hour, ${usd(t.volume1hUsd)} traded in the hour. Reading it closely.`);
   talk('umkhonto', a.dipNote ? `${a.dipNote}. That is the tested deep dip.` : a.smartNote ?? 'The signals agree.', 'yes', 'STRIKE');
   if ((t.smart?.count ?? 0) > 0) talk('izinyoni', `${t.smart.count} listed smart wallet${t.smart.count === 1 ? '' : 's'} bought in the last 15 minutes.`, 'yes', `+${t.smart.count}`);
-  const size = positionSize({ balanceSol: bal, equitySol: equity, stopPct: a.stopPct ?? 10, openPositions: mine().length, dayPnlSol: 0, sizeFactor: a.sizeFactor ?? 1 }, r);
+  const size = positionSize({ balanceSol: bal, equitySol: equity, stopPct: a.stopPct ?? 10, openPositions: sellable().length, dayPnlSol: 0, sizeFactor: a.sizeFactor ?? 1 }, r);
   if (!size.sol) { say('induna', `${t.symbol}: no room. ${size.reasons.join('; ')}.`); talk('induna', `NOT NOW. ${size.reasons.join('; ')}.`, 'wait', 'WAIT', true); return false; }
-  talk('induna', `${mine().length} of ${r.maxOpenPositions} slots in use. Size ${size.sol.toFixed(3)} SOL: a ${(a.stopPct ?? 10).toFixed(0)}% stop risks about ${(size.sol * (a.stopPct ?? 10) / equity).toFixed(1)}% of the wallet.`, 'yes', 'ROOM');
+  talk('induna', `${sellable().length} of ${r.maxOpenPositions} slots in use. Size ${size.sol.toFixed(3)} SOL: a ${(a.stopPct ?? 10).toFixed(0)}% stop risks about ${(size.sol * (a.stopPct ?? 10) / equity).toFixed(1)}% of the wallet.`, 'yes', 'ROOM');
   const safety = await api(`/api/coin?what=mint&mint=${t.mint}`);
   const missed = (rule) => emit('missed', { mint: t.mint, symbol: t.symbol, price: t.priceUsd ?? a.price, rule });
   if (!safety.safe) { missed('token'); talk('isihlangu', `${safety.reason}.`, 'no', 'FAIL'); talk('induna', 'REFUSED. Not again for 6 hours.', 'no', 'NO', true); say('isihlangu', `${t.symbol} refused: ${safety.reason}.`, 'down'); state.cooldown[t.mint] = Date.now() + 6 * 3_600_000; return false; }
@@ -75,7 +78,7 @@ export async function buy(t, rules) {
   }
   const price = Number(q.quote.swapUsdValue) / (Number(got) / 10 ** safety.decimals), entry = Number.isFinite(price) && price > 0 ? price : a.price;
   const stop = entry * (1 - (a.stopPct ?? 10) / 100);
-  state.positions.push({ mode: state.mode, mint: t.mint, symbol: t.symbol, pool: t.pool, solIn: spent, tokenRaw: got, entry, stop, baseStop: stop, target: entry * (1 + rules.settings.targetPct / 100), entryBar: a.at ?? Date.now(), openedAt: Date.now(), peak: entry, tf: a.tf === 1 ? 1 : 5, ...(a.style === 'dip' ? { dip: 1 } : {}), style: a.style ?? 'trend', auto: {}, sig, rules: rules.version, costPct, depth: Number.isFinite(a.stretchPct) ? a.stretchPct : null });
+  state.positions.push({ mode: state.mode, mint: t.mint, symbol: t.symbol, pool: t.pool, solIn: spent, tokenRaw: got, entry, stop, baseStop: stop, target: entry * (1 + rules.settings.targetPct / 100), entryBar: a.at ?? Date.now(), openedAt: Date.now(), peak: entry, tf: a.tf === 1 ? 1 : 5, ...(a.style === 'dip' ? { dip: 1 } : {}), style: a.style ?? 'trend', auto: {}, sig, rules: rules.version, costPct, depth: Number.isFinite(a.stretchPct) ? a.stretchPct : null, costs: entryCosts({ requestedSol: size.sol, spentSol: spent, impactPct: q.check.impactPct }) });
   save(); emit('trade', { side: 'buy', symbol: t.symbol, sol: spent });
   talk('induna', `BUY ${spent.toFixed(4)} SOL${live() ? '' : ' (practice)'}. ${rules.settings.stepPct ? `A third at +${rules.settings.stepPct}%, a third at +${rules.settings.stepPct * 2}%, the rest at +${rules.settings.targetPct}%` : `Sell at +${rules.settings.targetPct}%`}, stop −${(a.stopPct ?? 10).toFixed(0)}%, out after ${rules.settings.holdHours} hours.`, 'yes', 'BUY', true);
   talk('umlobi', `Written down: entry $${entry.toPrecision(4)}, round-trip cost ${costPct.toFixed(2)}%, rules ${rules.version}.`);
@@ -85,24 +88,57 @@ export async function buy(t, rules) {
 
 /** Sell all of a position, or a part of it. Records the result after every cost. */
 export async function sell(p, reason, fraction = 1) {
-  const whole = fraction >= 0.999, held = live() ? await tokenRaw(p.mint) : BigInt(p.tokenRaw);
+  // The position remembers whether it is practice or live; that, not the mode on screen, decides what happens (from Laugh).
+  const isLive = p.mode === 'live', whole = fraction >= 0.999, held = isLive ? await tokenRaw(p.mint) : BigInt(p.tokenRaw);
   if (held === 0n) { state.positions = state.positions.filter((x) => x !== p); save(); return false; }
   const raw = whole ? held : held * BigInt(Math.round(fraction * 10_000)) / 10_000n;
+  if (raw === 0n) { say('induna', `${p.symbol}: that slice is too small to sell. Try a bigger share.`); return false; }
   const q = await api(`/api/quote?${new URLSearchParams({ inputMint: p.mint, outputMint: SOL, amount: raw.toString(), exit: '1' })}`);
   if (!q.check.ok) { say('induna', `${p.symbol}: cannot sell yet (${q.check.reasons.join('; ')}). Will retry.`); return false; }
   let out = Number(q.quote.outAmount) / 1e9;
   let rent = 0;
-  if (live()) { const before = await liveBalance(), res = await swap(q.quote, true); if (res.outcome !== 'confirmed') { say('induna', `${p.symbol}: sell ${res.outcome}. Checking again next round.`, 'down'); return false; } out = Math.max(0, await liveBalance() - before);
+  let exitSig = 'practice';
+  if (isLive) { const before = await liveBalance(), res = await swap(q.quote, true); exitSig = res.signature; if (res.outcome !== 'confirmed') { say('induna', `${p.symbol}: sell ${res.outcome}. Checking again next round.`, 'down'); return false; } out = Math.max(0, await liveBalance() - before);
     // The coin's now-empty account holds about 0.002 SOL of rent: close it and count that rent as part of what came back.
     if (whole) { rent = await reclaim(p.mint); out += rent; } }
   else state.paperSol += out;
   const cost = whole ? p.solIn : p.solIn * fraction, pnl = out - cost;
-  state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, solIn: cost, solOut: out, pnlSol: pnl, pnlPct: pnl / cost * 100, reason, style: p.style, partial: !whole, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules, costPct: p.costPct ?? null, preset: String(p.rules ?? state.preset).split(/[-+~]/)[0], peakPct: Number.isFinite(p.peak) && p.entry > 0 ? (p.peak / p.entry - 1) * 100 : null, depthPct: p.depth ?? null, px: p.last ?? null });
+  state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, solIn: cost, solOut: out, pnlSol: pnl, pnlPct: pnl / cost * 100, reason, style: p.style, partial: !whole, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules, costPct: p.costPct ?? null, preset: String(p.rules ?? state.preset).split(/[-+~]/)[0], peakPct: Number.isFinite(p.peak) && p.entry > 0 ? (p.peak / p.entry - 1) * 100 : null, depthPct: p.depth ?? null, px: p.last ?? null, exit: exitSig, rentBackSol: rent, costs: { entry: shareOf(p.costs ?? null, whole ? 1 : fraction), exitImpactPct: q.check.impactPct, exitQuotedSol: Number(q.quote.outAmount) / 1e9 } });
   if (whole) { state.positions = state.positions.filter((x) => x !== p); const R = resolveRules({ preset: state.preset, adapt: dials() }).risk; state.cooldown[p.mint] = Math.max(Date.now() + (pnl < 0 ? R.lossCooldownMinutes : R.cooldownMinutes) * 60_000, p.dip === 1 ? p.openedAt + DIP_REPEAT_HOURS * 3_600_000 : 0); } // the same waits as Laugh
-  else { p.solIn -= cost; p.tokenRaw = (held - raw).toString(); delete p.nowSol; } // the old value was for the whole position
+  else { p.solIn -= cost; p.tokenRaw = (held - raw).toString(); p.costs = shareOf(p.costs ?? null, 1 - fraction); delete p.nowSol; setTimeout(() => void requote(p), 300); } // the old value was for the whole position: price what is left now
   save(); emit('trade', { side: 'sell', symbol: p.symbol, pnl, mint: p.mint, pool: p.pool, px: p.last ?? null, reason, whole, preset: String(p.rules ?? state.preset).split(/[-+~]/)[0] });
   say('umlobi', `SELL ${p.symbol}${whole ? '' : ` (${Math.round(fraction * 100)}%)`}: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} SOL (${(pnl / cost * 100).toFixed(1)}%) · ${reason}${rent > 0 ? ` · ${rent.toFixed(4)} SOL of account rent back` : ''}.`, pnl >= 0 ? 'up' : 'down');
+  if (isLive && whole) await sweep();
   return true;
+}
+/** What what is left of a position would fetch right now (after a part-sale), so equity is right at once. */
+async function requote(p) {
+  try { if (!state.positions.includes(p)) return; const raw = p.mode === 'live' ? await tokenRaw(p.mint) : BigInt(p.tokenRaw); const q = await api(`/api/quote?${new URLSearchParams({ inputMint: p.mint, outputMint: SOL, amount: raw.toString(), exit: '1' })}`); p.nowSol = Number(q.quote.outAmount) / 1e9; save(); emit('positions'); } catch { /* priced at the next check */ }
+}
+/**
+ * Sweep (off unless you switch it on): after a whole live sale, with nothing left open, send what is above the amount
+ * you keep to the address you chose. The same rule as Laugh's (lib/vault.mjs sweepLamports).
+ */
+async function sweep() {
+  const w = state.sweep; if (!w?.on || !vault.unlocked) return;
+  try {
+    const lamports = sweepLamports({ balanceLamports: Math.round((await liveBalance()) * 1e9), keepSol: w.keepSol, openPositions: sellable().length, on: w.on, to: w.to }); if (!lamports) return;
+    const { blockhash } = await api('/api/chain'), tx = new Transaction({ feePayer: vault.keypair.publicKey, recentBlockhash: blockhash }).add(SystemProgram.transfer({ fromPubkey: vault.keypair.publicKey, toPubkey: new PublicKey(w.to), lamports }));
+    tx.sign(vault.keypair); const { signature } = await post('/api/send', { transaction: b64(tx.serialize()) }), outcome = await waitFor(signature);
+    if (outcome === 'confirmed') { const d = state.days?.live; if (d && Number.isFinite(d.start)) d.start = Math.max(0, d.start - lamports / 1e9); save(); }
+    say('umlobi', outcome === 'confirmed' ? `Swept ${(lamports / 1e9).toFixed(4)} SOL to your address, keeping ${w.keepSol} SOL to trade.` : `Sweep ${outcome}. Not resending; check the wallet.`, outcome === 'confirmed' ? 'up' : 'down');
+  } catch (e) { say('umlobi', `Sweep did not run (${e.message}). Nothing was sent.`, 'down'); }
+}
+/**
+ * Write off a position whose pool was emptied: take it off the list and record the loss honestly, as nothing received.
+ * The worthless coins stay in the wallet; this only stops Warrior counting them. The coin is left alone for 30 days.
+ */
+export function writeOff(p) {
+  if (!p.empty) return false;
+  state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, solIn: p.solIn, solOut: 0, pnlSol: -p.solIn, pnlPct: -100, reason: 'written-off', style: p.style, partial: false, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules, preset: String(p.rules ?? state.preset).split(/[-+~]/)[0], exit: 'none', costs: { entry: p.costs ?? null } });
+  state.positions = state.positions.filter((x) => x !== p); state.cooldown[p.mint] = Date.now() + 30 * 86_400_000; save();
+  emit('trade', { side: 'sell', symbol: p.symbol, pnl: -p.solIn, mint: p.mint, reason: 'written-off', whole: true });
+  say('umlobi', `${p.symbol} written off: ${p.solIn.toFixed(4)} SOL in, nothing out. Its pool was emptied and it could not be sold${p.mode === 'live' ? '' : ' (practice)'}.`, 'down'); return true;
 }
 
 /** Every 30 seconds: price each open position, take profit in steps, and follow the stop, target and clock. */
@@ -113,9 +149,10 @@ export async function watch(rules) {
     const p = list[i]; if (!p || m.pool !== p.pool) continue;
     if (m.peak) p.peak = m.peak; if (m.stop) p.stop = Math.max(p.stop, m.stop); if (m.lastPrice) p.last = m.lastPrice;
     if (p.empty) continue; // an emptied pool cannot be sold into
+    if (m.stale && Date.now() - (p.staleSaid ?? 0) > 3_600_000) { p.staleSaid = Date.now(); say('induna', `${p.symbol}: nobody has traded it for a while, so there are no fresh candles. Holding; its stop and target are still checked against the live price every 15 seconds.`); }
     if (m.action === 'exit') { await sell(p, m.reason); continue; }
     try { // what the position would fetch right now, for the screen and for the profit steps
-      const raw = live() ? await tokenRaw(p.mint) : BigInt(p.tokenRaw), q = await api(`/api/quote?${new URLSearchParams({ inputMint: p.mint, outputMint: SOL, amount: raw.toString(), exit: '1' })}`);
+      const raw = p.mode === 'live' ? await tokenRaw(p.mint) : BigInt(p.tokenRaw), q = await api(`/api/quote?${new URLSearchParams({ inputMint: p.mint, outputMint: SOL, amount: raw.toString(), exit: '1' })}`);
       p.nowSol = Number(q.quote.outAmount) / 1e9; const due = partialDue(p, (p.nowSol / p.solIn - 1) * 100, rules.settings);
       if (due?.kind === 'sell' && await sell(p, due.reason, due.fraction)) p.auto[due.mark] = true;
     } catch { /* priced again next round */ }
@@ -155,6 +192,11 @@ export async function addFunds(p, sol, slippageBps) {
   if (p.mode !== state.mode) throw new Error(`This position was opened in ${p.mode === 'live' ? 'live' : 'practice'} mode. Switch back to act on it`);
   if (!(sol >= 0.01 && sol <= 5)) throw new Error('Add 0.01 to 5 SOL');
   const bal = await balance(); if (sol > bal - (live() ? 0.01 : 0)) throw new Error(`Not enough SOL: ${bal.toFixed(4)} in the wallet${live() ? ', and about 0.01 is kept for fees' : ''}`);
+  // Your rules still apply (from Laugh): the most in one coin, and no new money on a day the loss limit has been reached.
+  const R = resolveRules({ preset: state.preset, adapt: dials() }).risk, equity = bal + heldSol(), cap = equity * R.maxPositionPct / 100;
+  if (p.solIn + sol > cap + 1e-9) throw new Error(`Your ${state.preset} rules allow at most ${R.maxPositionPct}% of the wallet in one coin: about ${Math.max(0, cap - p.solIn).toFixed(4)} SOL more fits in ${p.symbol}`);
+  const day = state.days?.[state.mode], down = day?.start > 0 ? (day.start - equity) / day.start * 100 : 0;
+  if (down >= R.dailyLossLimitPct) throw new Error(`Down ${down.toFixed(1)}% today: the ${R.dailyLossLimitPct}% daily loss limit is reached, so no new money goes in until tomorrow (or Reset the day)`);
   const safety = await api(`/api/coin?what=mint&mint=${p.mint}`); if (!safety.safe) throw new Error(safety.reason);
   const q = await api(`/api/quote?${new URLSearchParams({ inputMint: SOL, outputMint: p.mint, amount: String(Math.round(sol * 1e9)), slip: String(slippageBps) })}`);
   if (!q.check.ok) throw new Error(q.check.reasons.join('; '));
@@ -164,7 +206,8 @@ export async function addFunds(p, sol, slippageBps) {
   if (got <= 0n) throw new Error('no coins arrived');
   const price = Number(q.quote.swapUsdValue) / (Number(got) / 10 ** safety.decimals), had = Number(p.tokenRaw), more = Number(got);
   if (Number.isFinite(price) && price > 0 && had + more > 0) p.entry = (p.entry * had + price * more) / (had + more);
+  p.costs = addEntryCosts(p.costs ?? null, entryCosts({ requestedSol: sol, spentSol: spent, impactPct: q.check.impactPct }));
   p.solIn += spent; p.tokenRaw = (BigInt(p.tokenRaw) + got).toString(); delete p.nowSol; save(); emit('trade', { side: 'buy', symbol: p.symbol, sol: spent });
   say('umkhonto', `ADD ${p.symbol}: ${spent.toFixed(4)} SOL${live() ? '' : ' (practice)'} · now ${p.solIn.toFixed(4)} SOL in it.`, 'up'); return true;
 }
-export async function sellAll() { for (const p of [...mine()]) await sell(p, 'get-me-out'); }
+export async function sellAll() { for (const p of [...sellable()]) await sell(p, 'get-me-out'); }

@@ -4,7 +4,8 @@
 import { resolveRules, toQuery } from '/vendor/lib/presets.js';
 import { state, save, api, emit, on, lock, dials } from './store.js';
 import { claimTrading, releaseTrading, holdWhile } from './sync.js';
-import { buy, watch, balance, heldSol, live } from './trader.js';
+import { buy, watch, balance, heldSol, live, sellable, sell } from './trader.js';
+import { bedtimeState } from '/vendor/lib/mood.js';
 import { vault } from './wallet.js';
 import { fire } from './net.js';
 import { shadowRound } from './shadow.js';
@@ -55,13 +56,16 @@ async function round() {
     const picks = read.filter((t) => t.analysis?.decision === 'enter' && !owned.has(t.mint) && !((state.cooldown[t.mint] ?? 0) > Date.now()) && !(t.analysis.style === 'smart' && live()));
     if (!picks.length) roundTalk(scan, read, R);
     say('umkhonto', picks.length ? `Strike: ${picks.map((t) => `${t.symbol} (${t.analysis.dipNote ?? t.analysis.smartNote ?? 'signals agree'})`).join('; ')}.` : 'No coin is in the strike zone. Waiting is a position too.');
+    // bedtime: close everything at the time you chose, if you chose one
+    await bedtimeClose();
     // 5. the commander
     const bal = await balance(), equity = bal + heldSol(), start = rollDay(equity);
     const down = start > 0 ? (start - equity) / start * 100 : 0;
     if (down >= R.risk.dailyLossLimitPct) say('induna', `Down ${down.toFixed(1)}% today: the ${R.risk.dailyLossLimitPct}% limit is reached. No new trades until tomorrow.`, 'down');
-    else if (open.length >= R.risk.maxOpenPositions) say('induna', `Holding ${open.length}, the most ${state.preset} allows.`);
+    else if (sellable().length >= R.risk.maxOpenPositions) say('induna', `Holding ${sellable().length}, the most ${state.preset} allows.`);
+    else if (!bed().canOpen) { if (Date.now() - bedSaid > 3_600_000) { bedSaid = Date.now(); say('induna', `Bedtime rule: no new trades until ${bed().wakeAt}. Open positions are still watched.`); } }
     else if (picks.length && weatherFactor() === 0) { const w = weather(); say('induna', `Severe storm: only ${w.up} of ${w.n} deep dips bounced in the last 6 hours. The weather guard holds new buys.`, 'down'); emit('indaba-line', { who: 'induna', text: `SEVERE STORM. ${w.up} of ${w.n} deep dips bounced in 6 hours. The weather guard holds new buys.`, tone: 'wait', chip: 'WAIT', verdict: true }); }
-    else for (const t of picks) { if (weatherFactor() < 1) t.analysis = { ...t.analysis, sizeFactor: (t.analysis.sizeFactor ?? 1) * weatherFactor() }; if (state.positions.filter((p) => p.mode === state.mode).length >= R.risk.maxOpenPositions || !running) break; try { await buy(t, R); } catch (e) { say('induna', `${t.symbol}: buy failed (${e.message}). Nothing spent.`, 'down'); } }
+    else for (const t of picks) { if (weatherFactor() < 1) t.analysis = { ...t.analysis, sizeFactor: (t.analysis.sizeFactor ?? 1) * weatherFactor() }; if (sellable().length >= R.risk.maxOpenPositions || !running) break; try { await buy(t, R); } catch (e) { say('induna', `${t.symbol}: buy failed (${e.message}). Nothing spent.`, 'down'); } }
     // 6. the scribe
     const eq = (await balance()) + heldSol(); state.equity.push({ t: Date.now(), v: eq, mode: state.mode }); save(); emit('equity');
     say('umlobi', `Equity ${eq.toFixed(4)} SOL${live() ? '' : ' (practice)'}.`);
@@ -87,12 +91,28 @@ async function guard() { if (lock.busy) return; lock.busy = true; try { await wa
 
 // Another device's copy of the positions never replaces this one in the middle of a trade.
 holdWhile(() => !lock.busy);
+// Bedtime (from Laugh, off unless you set it): no new buys between the hours you choose; optionally close everything.
+let bedSaid = 0;
+const bed = () => { const d = new Date(); return bedtimeState(state.bedtime ?? { on: false }, d.getHours() * 60 + d.getMinutes()); };
+async function bedtimeClose() { if (!running || !bed().mustClose) return; const open = sellable(); if (!open.length) return; say('induna', `Bedtime rule: closing ${open.length} position${open.length === 1 ? '' : 's'} for the night.`); for (const p of open) { try { await sell(p, 'bedtime'); } catch { /* tried again next round */ } } }
+// One tab at a time (from Laugh): two Warrior tabs in one browser count as one device, so the device lease alone cannot
+// stop both from trading. A browser lock can: the second tab is told the impi is already out elsewhere.
+let releaseTab = null, wake = null;
+async function claimTab() {
+  if (!navigator.locks) return true;
+  return new Promise((resolve) => { navigator.locks.request('warrior-impi', { ifAvailable: true }, (lock) => { if (!lock) { resolve(false); return; } resolve(true); return new Promise((done) => { releaseTab = done; }); }); });
+}
+// Keep the screen awake while the impi is out (from Laugh): a sleeping screen lets the browser slow the page, and the
+// 15-second stop checks with it. Asked again when you come back to the tab, since the browser drops it when hidden.
+async function keepAwake() { try { if (running && document.visibilityState === 'visible' && !wake) { wake = await navigator.wakeLock?.request('screen'); wake?.addEventListener?.('release', () => { wake = null; }); } } catch { wake = null; } }
+document.addEventListener('visibilitychange', () => void keepAwake());
 export async function start() {
   if (running) return null;
+  if (!(await claimTab())) return 'The impi is already out in another Warrior tab in this browser. Call it back there first, or use that tab.';
   if (live()) { if (!vault.exists) return 'Make the trading wallet first.'; if (!vault.unlocked) return 'Unlock the trading wallet first.'; if (!state.backedUp) return 'Save the backup key first.'; }
-  const held = await claimTrading(); if (held) return held; // one device trades at a time
+  const held = await claimTrading(); if (held) { releaseTab?.(); releaseTab = null; return held; } // one device trades at a time
   running = true; state.streakFrom = Date.now(); save(); say('induna', `The impi is out: ${state.preset}, ${live() ? 'LIVE with real SOL' : 'practice money'}.`); void round();
-  timer = setInterval(round, 60_000); watcher = setInterval(guard, 30_000); emit('running'); return null;
+  timer = setInterval(round, 60_000); watcher = setInterval(guard, 30_000); void keepAwake(); emit('running'); return null;
 }
 // Pause after a losing streak: the chosen number of whole trades in a row lost since the impi was last sent out.
 export function losingStreak() { let n = 0; for (const t of state.trades) { if (t.mode !== state.mode || t.partial || t.closedAt < (state.streakFrom ?? 0)) continue; n = t.pnlSol < 0 ? n + 1 : 0; } return n; }
@@ -100,6 +120,6 @@ on('trade', ({ side } = {}) => {
   const limit = state.pauseAfter ?? 4; if (!running || side !== 'sell' || !limit) return;
   const n = losingStreak(); if (n >= limit) { say('induna', `${n} losing trades in a row: the impi is pausing, as you asked. Open positions keep their stops. Look at the scorecard, then send it out again when you are ready.`, 'down'); stop(); }
 });
-export function stop() { running = false; nextAt = 0; clearInterval(timer); clearInterval(watcher); void releaseTrading(); say('induna', 'The impi is resting. Open positions are still yours; start again to keep watching them.'); emit('running'); }
+export function stop() { running = false; nextAt = 0; clearInterval(timer); clearInterval(watcher); void releaseTrading(); releaseTab?.(); releaseTab = null; try { wake?.release(); } catch { /* already gone */ } wake = null; say('induna', 'The impi is resting. Open positions are still yours; start again to keep watching them.'); emit('running'); }
 /** A look without trading, so the dashboard is alive before the impi is sent. */
 export async function peek() { try { const t0 = performance.now(), scan = await api(`/api/scan?${toQuery({ preset: state.preset, adapt: dials() })}`); ms = performance.now() - t0; last = scan; emit('scan', scan); } catch { /* shown next time */ } }

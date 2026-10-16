@@ -330,3 +330,26 @@ select{font:13px var(--sans);padding:6px 8px;border:1px solid var(--line);border
   .pos-facts .closed{grid-column:1/-1;font:700 12px var(--mono);color:var(--down)}
 }
 .pos-facts .closed{font:700 12px var(--mono);color:var(--down)}
+
+/* care: bedtime and sweep */
+.care{grid-area:care}
+@media (min-width:1101px){.care{grid-area:auto}}
+@media (max-width:1100px){.desk{grid-template-areas:"core core" "agents pnl" "flow dist" "positions positions" "indaba indaba" "adapt watchtower" "portfolio score" "care wallet" "log log"}}
+@media (max-width:700px){.desk{grid-template-areas:"core" "pnl" "positions" "indaba" "adapt" "watchtower" "portfolio" "score" "care" "agents" "wallet" "flow" "dist" "log"}}
+.care-block{border-top:1px dashed var(--line);padding:10px 0}
+.care-block:first-of-type{border-top:0;padding-top:0}
+.check{display:flex;gap:8px;align-items:center;font-weight:700;font-size:13px;min-height:32px}
+.check input{width:auto}
+/* recent trades and the receipt */
+.pf-list.recent li{grid-template-columns:10px 1fr auto auto}
+.pf-list i.win{background:var(--up)}.pf-list i.loss{background:var(--down)}
+.receipt{display:grid;gap:0;border:1px solid var(--line);border-radius:10px;padding:4px 12px;margin:8px 0}
+.rline{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.rline:last-child{border-bottom:0}
+.rline b{display:block;font-size:13px}
+.rline span{display:block;font-size:11px;color:var(--soft)}
+.rsol{font:700 13px var(--mono);white-space:nowrap;text-align:right}
+.rline.total{border-top:1px solid var(--line)}
+.rline.total.up .rsol{color:var(--up)}.rline.total.down .rsol{color:var(--down)}
+dialog .dlg{max-height:calc(100vh - 40px);overflow:auto}
+.care .fields,.care .fields.three{grid-template-columns:minmax(0,1fr)}.care input{min-width:0}.check input{width:20px;height:20px;flex:none}
