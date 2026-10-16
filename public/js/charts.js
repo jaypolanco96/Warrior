@@ -6,7 +6,7 @@ function road(x, w) { const g = x.createLinearGradient(0, 0, w, 0); ROAD.forEach
 
 /** Equity over time: a rainbow line over a soft fill, with a dashed line where it started. */
 export function line(c, values) {
-  const [x, w, h] = prep(c); if (values.length < 2) { x.fillStyle = '#6b5a7e'; x.font = '12px ui-monospace,Consolas,monospace'; x.fillText('The curve starts with the first trade.', 6, h / 2); return; }
+  const [x, w, h] = prep(c); if (values.length < 2 || Math.max(...values) - Math.min(...values) < 1e-9) { x.fillStyle = '#6b5a7e'; x.font = '12px ui-monospace,Consolas,monospace'; x.fillText('Flat so far: the curve moves with the first trade.', 6, h / 2); x.fillStyle = '#ecdcc0'; x.fillRect(0, h - 2, w, 2); return; }
   const lo = Math.min(...values), hi = Math.max(...values), span = hi - lo || 1, px = (i) => 4 + i / (values.length - 1) * (w - 8), py = (v) => h - 6 - (v - lo) / span * (h - 12);
   x.setLineDash([3, 4]); x.strokeStyle = '#d9c7a8'; x.beginPath(); x.moveTo(0, py(values[0])); x.lineTo(w, py(values[0])); x.stroke(); x.setLineDash([]);
   x.beginPath(); values.forEach((v, i) => (i ? x.lineTo(px(i), py(v)) : x.moveTo(px(i), py(v)))); x.lineTo(px(values.length - 1), h); x.lineTo(px(0), h); x.closePath();

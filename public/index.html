@@ -24,18 +24,17 @@
 <div class="ticker" aria-label="Live system figures"><div id="ticker" class="ticker-run"></div></div>
 
 <main class="desk">
-  <!-- left column -->
+  <div class="col col-left">
   <section class="card agents" aria-labelledby="agents-h">
     <h2 id="agents-h" class="label">IMPI · SIX AGENTS</h2>
     <ul id="agents" class="agent-list"></ul>
   </section>
-
   <section class="card flow" aria-labelledby="flow-h">
     <h2 id="flow-h" class="label">ORDER FLOW · WATCHED COINS</h2>
     <table class="book"><thead><tr><th>COIN</th><th>5M</th><th>1H</th><th>VS AVG</th><th>VOL 1H</th></tr></thead><tbody id="flow"></tbody></table>
   </section>
-
-  <!-- centre: the impi -->
+  </div>
+  <div class="col col-mid">
   <section class="card core" aria-labelledby="core-h">
     <div class="core-head">
       <div>
@@ -51,8 +50,17 @@
     <canvas id="net" class="net" aria-label="The six agents around the impi's shield, lighting up as they work" role="img"></canvas>
     <p id="core-line" class="core-line" aria-live="polite">The impi is resting.</p>
   </section>
-
-  <!-- right column -->
+  <section class="card positions" aria-labelledby="pos-h">
+    <h2 id="pos-h" class="label">POSITIONS</h2>
+    <table class="book"><thead><tr><th>COIN</th><th>IN</th><th>NOW</th><th>P/L</th><th>STOP · PRICE · TARGET</th><th>HELD</th><th></th></tr></thead><tbody id="positions"></tbody></table>
+    <div class="row"><button id="out" class="btn ghost" type="button">Get me out: sell everything</button><button id="csv" class="btn ghost" type="button">Download history (CSV)</button><button id="reset" class="btn ghost" type="button">Reset practice</button></div>
+  </section>
+  <section class="card log" aria-labelledby="log-h">
+    <h2 id="log-h" class="label">LIVE FEED · WHAT EACH AGENT DID</h2>
+    <ol id="log" class="term" aria-live="polite"></ol>
+  </section>
+  </div>
+  <div class="col col-right">
   <section class="card pnl" aria-labelledby="pnl-h">
     <h2 id="pnl-h" class="label">EQUITY · <span id="pnl-mode">PRACTICE</span></h2>
     <div class="big"><span id="equity">—</span><span id="pnl-change" class="chg"></span></div>
@@ -60,29 +68,16 @@
     <dl class="stats"><dt>TRADES</dt><dd id="s-trades">0</dd><dt>WIN RATE</dt><dd id="s-win">—</dd><dt>AVG / TRADE</dt><dd id="s-avg">—</dd><dt>OPEN</dt><dd id="s-open">0</dd></dl>
     <dl class="stats"><dt>BEST</dt><dd id="s-best">—</dd><dt>WORST</dt><dd id="s-worst">—</dd><dt>PROFIT FACTOR</dt><dd id="s-pf">—</dd><dt>AVG HOLD</dt><dd id="s-hold">—</dd></dl>
   </section>
-
+  <section class="card wallet" aria-labelledby="w-h">
+    <h2 id="w-h" class="label">TRADING WALLET</h2>
+    <div id="w-body"></div>
+  </section>
   <section class="card dist" aria-labelledby="dist-h">
     <h2 id="dist-h" class="label">DIP CURVE · DISTANCE FROM 20-CANDLE AVERAGE</h2>
     <canvas id="dist-chart" class="chart" aria-label="How far the watched coins sit under or over their average" role="img"></canvas>
     <p class="small">The spear only strikes in the deep tail on the left: 8–10% under the average, RSI 35 or lower, on a busy coin.</p>
   </section>
-
-  <section class="card positions" aria-labelledby="pos-h">
-    <h2 id="pos-h" class="label">POSITIONS</h2>
-    <table class="book"><thead><tr><th>COIN</th><th>IN</th><th>NOW</th><th>P/L</th><th>STOP · PRICE · TARGET</th><th>HELD</th><th></th></tr></thead><tbody id="positions"></tbody></table>
-    <div class="row"><button id="out" class="btn ghost" type="button">Get me out: sell everything</button><button id="csv" class="btn ghost" type="button">Download history (CSV)</button><button id="reset" class="btn ghost" type="button">Reset practice</button></div>
-  </section>
-
-  <!-- bottom: wallet and the live log -->
-  <section class="card wallet" aria-labelledby="w-h">
-    <h2 id="w-h" class="label">TRADING WALLET</h2>
-    <div id="w-body"></div>
-  </section>
-
-  <section class="card log" aria-labelledby="log-h">
-    <h2 id="log-h" class="label">LIVE FEED · WHAT EACH AGENT DID</h2>
-    <ol id="log" class="term" aria-live="polite"></ol>
-  </section>
+  </div>
 </main>
 
 <footer class="strip">
