@@ -29,8 +29,10 @@ export function openPosition(start) {
   const now = p0.last ?? p0.entry, base = p0.entry;
   $('pos-title').textContent = `${p0.symbol} · add funds, sell part, stops and orders`;
   const head = el('div', 'pos-facts');
-  for (const [k, v] of [['IN', `${p0.solIn.toFixed(4)} SOL`], ['PAID', usd(base)], ['NOW', usd(now)], ['P/L', pct((now / base - 1) * 100)], ['IMPI STOP', usd(p0.stop)], ['IMPI TARGET', usd(p0.target)]]) { const d = el('div'); d.append(el('span', '', k), el('b', '', v)); head.append(d); }
-  const run = async (out, fn, done) => { if (!here()) { out.textContent = wrong; return; } out.textContent = 'Working…'; try { const r = await exclusive(fn); out.textContent = done(r); } catch (e) { out.textContent = `Not done: ${reasonOf(e)}.`; } emit('positions'); drawPortfolio(); };
+  // the summary is redrawn after every action, so it never shows the position as it was before a sale
+  const drawFacts = () => { const p = find(mint, mode) ?? p0, px = p.last ?? p.entry; head.replaceChildren(); for (const [k, v] of [['IN', `${p.solIn.toFixed(4)} SOL`], ['PAID', usd(p.entry)], ['NOW', usd(px)], ['P/L', pct((px / p.entry - 1) * 100)], ['IMPI STOP', usd(p.stop)], ['IMPI TARGET', usd(p.target)]]) { const d = el('div'); d.append(el('span', '', k), el('b', '', v)); head.append(d); } if (!find(mint, mode)) head.append(el('div', 'closed', 'Closed')); };
+  drawFacts();
+  const run = async (out, fn, done) => { if (!here()) { out.textContent = wrong; return; } out.textContent = 'Working…'; try { const r = await exclusive(fn); out.textContent = done(r); } catch (e) { out.textContent = `Not done: ${reasonOf(e)}.`; } drawFacts(); emit('positions'); drawPortfolio(); };
 
   // sell part now
   const part = section('Sell part of it now', 'Take some off the table and let the rest ride. The impi\'s stop and target, and your own, keep working on what is left.'), sP = status(), row = el('div', 'row');

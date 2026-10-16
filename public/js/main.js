@@ -89,7 +89,9 @@ async function drawMoney() {
     const px = p.last ?? p.entry, toStop = (p.stop / px - 1) * 100, toTgt = (p.target / px - 1) * 100, span = el('td', 'range'), bar = el('span', 'rbar'), mark = el('i'), at = Math.max(0, Math.min(1, (px - p.stop) / ((p.target - p.stop) || 1)));
     mark.className = `m${Math.round(at * 10)}`; bar.append(mark); span.append(el('span', 'down', pct(toStop)), bar, el('span', 'up', pct(toTgt)));
     const mins = Math.round((Date.now() - p.openedAt) / 60000);
-    tr.append(el('td'), el('td', '', p.solIn.toFixed(4)), el('td', '', now.toFixed(4)), el('td', g >= 0 ? 'up' : 'down', pct(g)), span, el('td', '', `${mins}m`), el('td', '', '')); tr.firstChild.append(name); if (p.empty) tr.firstChild.append(el('span', 'tagx', 'POOL EMPTY')); const m = el('button', 'sell', 'Manage'); m.type = 'button'; m.addEventListener('click', () => emit('position-tools', p)); tr.lastChild.append(m, b); if (p.ownStop || p.ownTarget) tr.firstChild.append(el('span', 'tagx mine', 'MY EXITS')); return tr; })
+    tr.append(el('td'), el('td', '', p.solIn.toFixed(4)), el('td', '', now.toFixed(4)), el('td', g >= 0 ? 'up' : 'down', pct(g)), span, el('td', '', `${mins}m`), el('td', '', ''));
+    // labels for the phone layout, where each position is a stacked card
+    ['', 'In', 'Now', 'P/L', 'Stop · price · target', 'Held', ''].forEach((l, k) => { tr.children[k].dataset.l = l; }); tr.firstChild.append(name); if (p.empty) tr.firstChild.append(el('span', 'tagx', 'POOL EMPTY')); const m = el('button', 'sell', 'Manage'); m.type = 'button'; m.addEventListener('click', () => emit('position-tools', p)); tr.lastChild.append(m, b); if (p.ownStop || p.ownTarget) tr.firstChild.append(el('span', 'tagx mine', 'MY EXITS')); return tr; })
     : [(() => { const tr = el('tr'), td = el('td', 'small', 'Nothing open. The impi buys only in the strike zone.'); td.colSpan = 7; tr.append(td); return tr; })()]));
 }
 on('equity', drawMoney); on('positions', drawMoney); on('trade', drawMoney); setInterval(() => { if (state.positions.length) void drawMoney(); }, 15_000);

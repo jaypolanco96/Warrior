@@ -309,3 +309,24 @@ select{font:13px var(--sans);padding:6px 8px;border:1px solid var(--line);border
 .tour-veil[hidden],.tour-frame[hidden],.tour-card[hidden]{display:none}
 @media (prefers-reduced-motion:reduce){.tour-frame,.tour-card{transition:none}}
 .tour-count{white-space:nowrap}.tour-dots{gap:3px}.tour-dot{width:8px;height:8px}
+
+/* phones: each position is a stacked card with labelled figures and full-width buttons; finger-sized taps */
+@media (max-width:700px){
+  .positions .book thead{display:none}
+  .positions .book,.positions .book tbody{display:block}
+  .positions .book tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;padding:12px 0;border-bottom:1px dashed var(--line)}
+  .positions .book td{display:block;border:0;padding:0;text-align:left;white-space:normal}
+  .positions .book td[data-l]:not([data-l=""])::before{content:attr(data-l);display:block;font:700 9px var(--mono);letter-spacing:.1em;color:var(--soft);text-transform:uppercase}
+  .positions .book td:first-child{grid-column:1/-1;font-size:15px}
+  .positions .book td:first-child a{display:inline-block;padding:6px 0}
+  .positions .book td.range{grid-column:1/-1;display:flex;justify-content:flex-start;gap:8px;align-items:center}
+  .positions .book td.range::before{flex:0 0 100%}
+  .positions .book td.range{flex-wrap:wrap}
+  .positions .book td:last-child{grid-column:1/-1;display:flex;gap:8px}
+  .positions .book td:last-child .sell{flex:1}
+  .positions .book td[colspan]{grid-column:1/-1}
+  .book .sell{min-height:42px;padding:8px 14px;font-size:13px}
+  .foot a{display:inline-block;padding:10px 4px}
+  .pos-facts .closed{grid-column:1/-1;font:700 12px var(--mono);color:var(--down)}
+}
+.pos-facts .closed{font:700 12px var(--mono);color:var(--down)}
