@@ -1,0 +1,14 @@
+node_modules/
+# Built from node_modules by `npm run build`.
+public/vendor/
+scripts/.vendor-entry.mjs
+.vercel/
+.env
+.env.*
+!.env.example
+# The bot's wallet key, positions and logs never leave this machine.
+.laugh/
+.coin-toolchain/
+
+.vercel
+.env*

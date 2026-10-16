@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Privacy — Warrior</title>
+<meta name="description" content="What Warrior knows about you, in plain words. It is very little." />
+<meta name="theme-color" content="#07060d" />
+<link rel="icon" href="/icon-192.png" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<header class="top"><a class="brand" href="/" aria-label="Warrior home"><span class="emoji" aria-hidden="true">😄</span><span class="word">Warrior</span></a><nav class="legal-nav"><a href="/risk">Risks</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></nav></header>
+<main class="legal">
+<h1>Privacy</h1>
+<p class="muted">Written in plain words on October 12, 2026. This is a draft by the people who built Warrior. A lawyer has not reviewed it yet; when one does, this line will say so and give the date.</p>
+<h2>The short version</h2>
+<p>Warrior has no accounts, no sign-up, no cookies, no advertising and no analytics. It does not know your name or your email. Almost everything it remembers stays in your own browser.</p>
+
+<h2>What stays on your device</h2>
+<p>Your browser stores these for this site only. Clearing the site's data removes them.</p>
+<ul>
+<li>The trading wallet's key, encrypted with your passphrase. Warrior's servers never receive the key or the passphrase.</li>
+<li>Practice and real positions, trade history, orders, slices, your watchlist and the wallets you follow.</li>
+<li>Your settings: the strategy dial, bedtime rule, sound, alerts and whether you have seen the welcome.</li>
+<li>Today's activity for "My day", your league name and friends' league codes, and your comfort answers.</li>
+<li>A saved copy of the site's own files, so the installed app can open without a connection.</li>
+</ul>
+
+<h2>What leaves your device</h2>
+<ul>
+<li><b>To Warrior's server</b> (run on Vercel): requests for scans, coin lookups, prices, quotes and balances. These include coin addresses and, when a wallet is involved, its public address. A trade you make with the trading wallet is sent as an already-signed transaction for the server to pass on. Like any website, the server sees your IP address, and Vercel keeps short-lived technical logs. Warrior does not build profiles from them.</li>
+<li><b>To the services behind it:</b> Warrior's server asks GeckoTerminal, DexScreener and Jupiter for market data, Jupiter for quotes and swap transactions, a Solana network provider for balances and sending, and Jito's block builders when protected sending is on. They see the coin and wallet addresses involved. They do not see your IP address through Warrior, because the request comes from Warrior's server.</li>
+<li><b>To your own wallet:</b> when you connect Phantom or Solflare, the wallet shares your public address with the page.</li>
+<li><b>To the Solana network:</b> every real trade is public and permanent, like all Solana transactions. Anyone can see what a public address bought and sold.</li>
+</ul>
+
+<h2>What is never collected</h2>
+<p>Seed phrases, private keys, passphrases, names, emails, phone numbers, contacts, location, or anything typed into the comfort check. Comfort answers leave your device only if you copy and send them yourself.</p>
+
+<h2>Things made public on purpose</h2>
+<p>The public scorecard lists coins Warrior's recorder called and what the price did next. It contains no information about any user. A Warrior card or a league code contains only what you see on it, and goes only where you send it.</p>
+
+<h2>Your choices</h2>
+<p>Use practice mode and nothing about you is involved beyond ordinary page requests. Clear the site's data in your browser to erase everything Warrior stored. Because there are no accounts, there is nothing for us to look up, export or delete on our side.</p>
+
+<h2>Still open</h2>
+<p>Privacy laws such as the GDPR and the CCPA ask for named contacts and formal notices. Those will be added when a lawyer has reviewed this page and the legal operator of Warrior is named.</p>
+
+<p><a href="/">Back to Warrior</a></p>
+</main>
+<footer><span>😂 Warrior</span><span>Not financial advice. No profit is promised. You approve and own every trade.</span></footer>
+</body>
+</html>

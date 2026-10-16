@@ -1,0 +1,35 @@
+name: Rocket launch wallets
+# Every two hours: rebuild public/rocket-wallets.json, the wallets Rocket Mode's copy filter follows
+# (scripts/rocket-wallets.mjs). Read-only public market data; no keys, no trades.
+on:
+  schedule:
+    - cron: '41 */2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: rocket-wallets
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 30
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the list
+        run: node scripts/rocket-wallets.mjs
+      - name: Commit the list
+        run: |
+          # Committed in the owner's name for the same reason as the scorecard; the message says it is automated.
+          OWNER=$(git log -30 --format='%an|%ae' | grep -v 'scorecard@users.noreply.github.com' | head -1)
+          git config user.name "${OWNER%%|*}"
+          git config user.email "${OWNER##*|}"
+          git add public/rocket-wallets.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Rocket wallets: automated list rebuild $(date -u +%Y-%m-%dT%H:%MZ)"
+          git pull --rebase origin main && git push

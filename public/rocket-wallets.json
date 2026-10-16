@@ -1,0 +1,24 @@
+{
+ "at": "2026-10-16T13:32:13.697Z",
+ "launches": 26,
+ "rule": "ahead on 2+ pump.fun launches in their first 30 minutes, and ahead overall, over the last 6 hours",
+ "wallets": [
+  "2GvjXcCuAaaN28E99BceoKcZw8AurZse5YNX9Wiy5J29",
+  "2k2jJVet1SeAKvVSbvd8pZbqpaLcbMgRmYx8EhNTUJf9",
+  "2tgUbS9UMoQD6GkDZBiqKYCURnGrSb6ocYwRABrSJUvY",
+  "574kzAeynwQ2ogNBSzdCum4Vt6RTmwduANy6SQPBW8cE",
+  "5yG4mGd9SmqwACgycrG1eVspy76eoQjfxu1V1z5GVNzj",
+  "AQuR7GnPgXRpNwpHiwf7LeWkJad3pAFKSehgbZRgWpKz",
+  "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51",
+  "AvocW1HYwENdgbY89es1nAhJMPgtVdbdVmC29tLpCiGv",
+  "CvoHwuzD6i3xae7vw2FinaMf5HYk7v5exNXoMAC91wz9",
+  "Cy2orvUMTKUK7QN5Zh8DPx2aceBusxXMeRm6oYPGRD8h",
+  "Dxm74DtsrTmgdQXMrffzrRdaRhxpbWVhLcFVgwBbeTLN",
+  "F6pq4UnxJVGfNiFdW9YJG1QPppvNuCdFWTNqdWqpeiCZ",
+  "GP3Mu52o28mWqLXBiY5qwDdhuF3jykK5LrDPPMV5fosT",
+  "GQPkHyNr5DpJvYYVkpQUn9zDncG42p5eYnengNXFcioX",
+  "GRRq67aPtraJoEM3PL2ENxLYQeNSyCdL1fCKgktMLJKS",
+  "HRBonvjq6YE62jKnXpwH9wjxLqhiikf2hdFgVTef1Cvm",
+  "yoX5cH7qW7CKhZyM7mHK8RfBe3RUJGnEq7iwZcYeYXG"
+ ]
+}
