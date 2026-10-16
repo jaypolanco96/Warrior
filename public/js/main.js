@@ -4,6 +4,9 @@ import { vault, owner, connectPhantom, disconnectPhantom, reconnectPhantom, fund
 import { AGENTS, impi, start, stop, peek, rules } from './impi.js';
 import { sell, sellAll, balance, heldSol } from './trader.js';
 import { startNet } from './net.js';
+import { rebasePosition } from '/vendor/lib/strategy.js';
+/** As in Laugh: open positions take the new strength's stop and target at once. A stop that has already moved up to the price paid or above is kept. */
+function followRules() { const s = rules().settings; let moved = 0; for (const p of state.positions) { const r = rebasePosition(p, s); if (!r) continue; p.target = r.target; p.stop = r.stop; p.baseStop = r.baseStop; p.rules = rules().version; moved++; } if (moved) emit('say', { who: 'induna', text: `${moved} open position${moved === 1 ? '' : 's'} now follow the new strength's stop and target.` }); }
 import { line, hist, bars } from './charts.js';
 
 const $ = (id) => document.getElementById(id);
@@ -70,7 +73,7 @@ function drawControls() {
 const setMode = (m) => { if (impi.running) { emit('say', { who: 'induna', text: 'Call the impi back before switching between practice and live.' }); return; } state.mode = m; save(); drawControls(); drawWallet(); void drawMoney(); };
 $('mode-paper').addEventListener('click', () => setMode('paper'));
 $('mode-live').addEventListener('click', () => setMode('live'));
-document.querySelectorAll('.preset').forEach((b) => b.addEventListener('click', () => { state.preset = b.dataset.preset; save(); drawControls(); emit('say', { who: 'induna', text: `Strength set to ${b.textContent}: ${rules().risk.maxOpenPositions} coins at once, ${rules().risk.riskPerTradePct}% of the wallet at risk a trade.` }); void peek(); }));
+document.querySelectorAll('.preset').forEach((b) => b.addEventListener('click', () => { state.preset = b.dataset.preset; followRules(); save(); drawControls(); emit('say', { who: 'induna', text: `Strength set to ${b.textContent}: ${rules().risk.maxOpenPositions} coins at once, ${rules().risk.riskPerTradePct}% of the wallet at risk a trade.` }); void peek(); }));
 let armed = 0;
 $('go').addEventListener('click', () => {
   if (impi.running) { stop(); drawControls(); return; }

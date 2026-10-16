@@ -3,7 +3,7 @@
 // 30 seconds. The rules come from the chosen strength (Chill, Balanced, Spicy), tested on real Solana prices.
 import { resolveRules, toQuery } from '/vendor/lib/presets.js';
 import { state, save, api, emit, on } from './store.js';
-import { buy, watch, balance, heldSol, live } from './trader.js';
+import { buy, watch, liveStops, balance, heldSol, live } from './trader.js';
 import { vault } from './wallet.js';
 import { fire } from './net.js';
 
@@ -16,7 +16,7 @@ export const AGENTS = [
   { id: 'umlobi', name: 'Umlobi', glyph: '✎', role: 'scribe', job: 'Writes down every decision and every result, costs included.' }
 ];
 export const rules = () => resolveRules({ preset: state.preset });
-let running = false, timer = 0, watcher = 0, busy = false, last = null;
+let running = false, timer = 0, watcher = 0, stopper = 0, busy = false, last = null;
 export const impi = { get running() { return running; }, get lastScan() { return last; } };
 const say = (who, text, tone) => emit('say', { who, text, tone });
 on('say', ({ who }) => fire(who));
@@ -52,14 +52,15 @@ async function round() {
   } catch (e) { say('inhloli', `This round could not run (${e.message}). Trying again in a minute; nothing was traded.`, 'down'); }
   finally { busy = false; }
 }
+async function quick() { if (busy) return; busy = true; try { await liveStops(); emit('positions'); } catch { /* next time */ } finally { busy = false; } }
 async function guard() { if (busy) return; busy = true; try { await watch(rules()); emit('positions'); } catch { /* next time */ } finally { busy = false; } }
 
 export function start() {
   if (running) return null;
   if (live()) { if (!vault.exists) return 'Make the trading wallet first.'; if (!vault.unlocked) return 'Unlock the trading wallet first.'; if (!state.backedUp) return 'Save the backup key first.'; }
   running = true; say('induna', `The impi is out: ${state.preset}, ${live() ? 'LIVE with real SOL' : 'practice money'}.`); void round();
-  timer = setInterval(round, 60_000); watcher = setInterval(guard, 30_000); emit('running'); return null;
+  timer = setInterval(round, 60_000); watcher = setInterval(guard, 30_000); stopper = setInterval(quick, 15_000); emit('running'); return null;
 }
-export function stop() { running = false; clearInterval(timer); clearInterval(watcher); say('induna', 'The impi is resting. Open positions are still yours; start again to keep watching them.'); emit('running'); }
+export function stop() { running = false; clearInterval(timer); clearInterval(watcher); clearInterval(stopper); say('induna', 'The impi is resting. Open positions are still yours; start again to keep watching them.'); emit('running'); }
 /** A look without trading, so the dashboard is alive before the impi is sent. */
 export async function peek() { try { const scan = await api(`/api/scan?${toQuery({ preset: state.preset })}`); last = scan; emit('scan', scan); } catch { /* shown next time */ } }
