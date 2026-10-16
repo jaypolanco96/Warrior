@@ -16,8 +16,8 @@ export const AGENTS = [
   { id: 'umlobi', name: 'Umlobi', glyph: '✎', role: 'scribe', job: 'Writes down every decision and every result, costs included.' }
 ];
 export const rules = () => resolveRules({ preset: state.preset });
-let running = false, timer = 0, watcher = 0, stopper = 0, busy = false, last = null;
-export const impi = { get running() { return running; }, get lastScan() { return last; } };
+let running = false, timer = 0, watcher = 0, stopper = 0, busy = false, last = null, nextAt = 0, rounds = 0, ms = 0;
+export const impi = { get running() { return running; }, get lastScan() { return last; }, get nextAt() { return nextAt; }, get rounds() { return rounds; }, get scanMs() { return ms; } };
 const say = (who, text, tone) => emit('say', { who, text, tone });
 on('say', ({ who }) => fire(who));
 
@@ -25,11 +25,11 @@ on('say', ({ who }) => fire(who));
 function rollDay(equity) { const d = new Date().toISOString().slice(0, 10), k = state.mode; state.days ??= {}; if (state.days[k]?.day !== d || !Number.isFinite(state.days[k]?.start)) state.days[k] = { day: d, start: equity }; return state.days[k].start; }
 
 async function round() {
-  if (busy) return; busy = true;
+  if (busy) return; busy = true; nextAt = Date.now() + 60_000; rounds++;
   try {
     const R = rules(), open = state.positions.filter((p) => p.mode === state.mode);
     // 1. the scout
-    const scan = await api(`/api/scan?${toQuery({ preset: state.preset })}`); last = scan; emit('scan', scan);
+    const t0 = performance.now(), scan = await api(`/api/scan?${toQuery({ preset: state.preset })}`); ms = performance.now() - t0; last = scan; emit('scan', scan);
     const read = scan.results ?? [], quiet = read.filter((t) => t.analysis?.quiet).length;
     say('inhloli', `${scan.universe} coins watched; ${read.length} read closely${quiet ? `, ${quiet} too quiet to trade` : ''}.`);
     // 2. the shield
@@ -61,6 +61,6 @@ export function start() {
   running = true; say('induna', `The impi is out: ${state.preset}, ${live() ? 'LIVE with real SOL' : 'practice money'}.`); void round();
   timer = setInterval(round, 60_000); watcher = setInterval(guard, 30_000); stopper = setInterval(quick, 15_000); emit('running'); return null;
 }
-export function stop() { running = false; clearInterval(timer); clearInterval(watcher); clearInterval(stopper); say('induna', 'The impi is resting. Open positions are still yours; start again to keep watching them.'); emit('running'); }
+export function stop() { running = false; nextAt = 0; clearInterval(timer); clearInterval(watcher); clearInterval(stopper); say('induna', 'The impi is resting. Open positions are still yours; start again to keep watching them.'); emit('running'); }
 /** A look without trading, so the dashboard is alive before the impi is sent. */
-export async function peek() { try { const scan = await api(`/api/scan?${toQuery({ preset: state.preset })}`); last = scan; emit('scan', scan); } catch { /* shown next time */ } }
+export async function peek() { try { const t0 = performance.now(), scan = await api(`/api/scan?${toQuery({ preset: state.preset })}`); ms = performance.now() - t0; last = scan; emit('scan', scan); } catch { /* shown next time */ } }

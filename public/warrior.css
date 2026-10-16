@@ -110,3 +110,27 @@ dialog::backdrop{background:rgba(27,18,48,.35)}
 .net{flex:none;height:440px;min-height:0}
 .bars{height:30px}
 @media (max-width:700px){.net{height:300px}}
+
+/* controls on one row */
+.core-head{align-items:flex-start}
+.mode{flex-direction:row;align-items:center;flex-wrap:nowrap;gap:8px}
+@media (max-width:700px){.mode{flex-wrap:wrap}.mode .btn.go{flex:1 1 100%}}
+/* agent figures */
+.agent-top{display:flex;justify-content:space-between;gap:6px;align-items:center}
+.fig{font:700 10px var(--mono);letter-spacing:.06em;padding:1px 7px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.fig.c0{color:#e63946}.fig.c1{color:#f77f00}.fig.c2{color:#b88600}.fig.c3{color:#2a9d8f}.fig.c4{color:#1d70e0}.fig.c5{color:#7b2cbf}
+/* order flow: the strike zone lights up */
+.book tr.hot td{background:#fff1f3}
+.book tr.hot td:first-child{box-shadow:inset 3px 0 0 var(--r1);font-weight:800}
+/* positions: stop to target bar */
+.range{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+.rbar{position:relative;width:70px;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--down),#f3e6d0 50%,var(--up))}
+.rbar i{position:absolute;top:-3px;width:4px;height:12px;border-radius:2px;background:var(--ink)}
+.rbar i.m0{left:0}.rbar i.m1{left:10%}.rbar i.m2{left:20%}.rbar i.m3{left:30%}.rbar i.m4{left:40%}.rbar i.m5{left:50%}.rbar i.m6{left:60%}.rbar i.m7{left:70%}.rbar i.m8{left:80%}.rbar i.m9{left:90%}.rbar i.m10{left:calc(100% - 4px)}
+.tagx{font:700 9px var(--mono);color:#fff;background:var(--down);border-radius:4px;padding:1px 4px;margin-left:6px}
+.positions{overflow-x:auto}
+.stats + .stats{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+/* the ticker scrolls */
+.ticker-run{text-overflow:clip;display:flex}
+.tick-set{flex:none;padding-right:24px;animation:tick 60s linear infinite}
+@keyframes tick{to{transform:translateX(-100%)}}

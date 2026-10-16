@@ -3,7 +3,7 @@ import { state, save, on, emit } from './store.js';
 import { vault, owner, connectPhantom, disconnectPhantom, reconnectPhantom, fundFromPhantom, withdraw, liveBalance } from './wallet.js';
 import { AGENTS, impi, start, stop, peek, rules } from './impi.js';
 import { sell, sellAll, balance, heldSol } from './trader.js';
-import { startNet } from './net.js';
+import { startNet, setData } from './net.js';
 import { rebasePosition } from '/vendor/lib/strategy.js';
 /** As in Laugh: open positions take the new strength's stop and target at once. A stop that has already moved up to the price paid or above is kept. */
 function followRules() { const s = rules().settings; let moved = 0; for (const p of state.positions) { const r = rebasePosition(p, s); if (!r) continue; p.target = r.target; p.stop = r.stop; p.baseStop = r.baseStop; p.rules = rules().version; moved++; } if (moved) emit('say', { who: 'induna', text: `${moved} open position${moved === 1 ? '' : 's'} now follow the new strength's stop and target.` }); }
@@ -14,11 +14,30 @@ const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls)
 const pct = (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
 const money = (n) => !Number.isFinite(n) ? '—' : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}K` : `$${Math.round(n)}`;
 
+// ---------- live figures: one chip per agent, read-outs on the shield ----------
+const fig = {};
+function figures() {
+  const scan = impi.lastScan, read = scan?.results ?? [], R = rules(), mine = state.trades.filter((t) => t.mode === state.mode && !t.partial), open = state.positions.filter((p) => p.mode === state.mode).length;
+  const won = mine.filter((t) => t.pnlSol > 0).length, zone = read.filter((t) => t.analysis?.decision === 'enter').length, birds = read.reduce((n, t) => n + (t.smart?.count ?? 0), 0);
+  fig.inhloli = scan ? `${scan.universe} WATCHED` : 'SCANNING';
+  fig.isihlangu = scan ? `${scan.passedScreen}/${scan.universe} PASS` : '—';
+  fig.umkhonto = `${zone} IN ZONE`;
+  fig.izinyoni = `${birds} SMART BUYS`;
+  fig.induna = `${open}/${R.risk.maxOpenPositions} OPEN`;
+  fig.umlobi = mine.length ? `${mine.length} · ${Math.round(won / mine.length * 100)}% WIN` : '0 TRADES';
+  const day = state.days?.[state.mode]?.start, eq = Number.parseFloat($('equity').textContent), ch = day && Number.isFinite(eq) ? (eq / day - 1) * 100 : null;
+  const left = impi.nextAt ? Math.max(0, Math.ceil((impi.nextAt - Date.now()) / 1000)) : 0;
+  setData({ agents: { ...fig }, running: impi.running, nextAt: impi.nextAt, slots: [open, R.risk.maxOpenPositions],
+    top: Number.isFinite(eq) ? `${eq.toFixed(3)} SOL` : '', mid: ch === null ? '' : `${pct(ch)} TODAY`, midUp: (ch ?? 0) >= 0,
+    next: impi.running ? `ROUND ${impi.rounds} · NEXT ${left}s` : 'RESTING', bottom: scan ? `SCAN ${Math.round(impi.scanMs)}ms · ${state.preset.toUpperCase()}` : state.preset.toUpperCase() });
+}
+setInterval(figures, 1000);
+
 // ---------- agents and the live feed ----------
 const said = {};
 function drawAgents() {
   $('agents').replaceChildren(...AGENTS.map((a, i) => { const li = el('li', `agent ${Date.now() - (said[a.id]?.at ?? 0) < 4000 ? 'busy' : ''}`), dot = el('span', 'dot'); dot.dataset.i = String(i);
-    const body = el('div'); body.append(el('b', '', `${a.glyph} ${a.name.toUpperCase()}`), el('div', 'role', `${a.role} · ${a.job}`), el('div', 'say', said[a.id]?.text ?? 'Ready.')); li.append(dot, body); return li; }));
+    const body = el('div'), top = el('div', 'agent-top'); top.append(el('b', '', `${a.glyph} ${a.name.toUpperCase()}`), el('span', `fig c${i}`, fig[a.id] ?? '—')); body.append(top, el('div', 'role', `${a.role} · ${a.job}`), el('div', 'say', said[a.id]?.text ?? 'Ready.')); li.append(dot, body); return li; }));
   document.querySelectorAll('.agent .dot').forEach((d) => d.classList.add(`c${d.dataset.i}`));
 }
 on('say', ({ who, text, tone }) => {
@@ -32,15 +51,19 @@ on('say', ({ who, text, tone }) => {
 // ---------- market panels ----------
 on('scan', (scan) => {
   const read = scan.results ?? [];
-  $('flow').replaceChildren(...read.slice(0, 18).map((t) => { const tr = el('tr'), c5 = t.change?.m5 ?? 0, c1 = t.change?.h1 ?? 0;
-    tr.append(el('td', '', String(t.symbol).slice(0, 10)), el('td', c5 >= 0 ? 'up' : 'down', pct(c5)), el('td', c1 >= 0 ? 'up' : 'down', pct(c1)), el('td', '', money(t.volume1hUsd))); return tr; }));
+  $('flow').replaceChildren(...read.slice(0, 14).map((t) => { const tr = el('tr'), c5 = t.change?.m5 ?? 0, c1 = t.change?.h1 ?? 0;
+    const gap = t.analysis?.stretchPct, hot = Number.isFinite(gap) && gap <= -(rules().settings.dipBelowPct ?? 10); if (hot || t.analysis?.decision === 'enter') tr.className = 'hot';
+    tr.append(el('td', '', String(t.symbol).slice(0, 10)), el('td', c5 >= 0 ? 'up' : 'down', pct(c5)), el('td', c1 >= 0 ? 'up' : 'down', pct(c1)), el('td', Number.isFinite(gap) && gap < 0 ? 'down' : '', Number.isFinite(gap) ? pct(gap) : '—'), el('td', '', money(t.volume1hUsd))); return tr; }));
+  figures();
   hist($('dist-chart'), read.map((t) => t.analysis?.stretchPct), -(rules().settings.dipBelowPct ?? 10));
   bars($('bars'), read.map((t) => t.volume1hUsd ?? 0));
   ticker(scan);
 });
+
 function ticker(scan) {
-  const R = rules(), s = R.settings, parts = [['MODE', state.mode === 'live' ? 'LIVE' : 'PRACTICE'], ['STRENGTH', state.preset.toUpperCase()], ['WATCHED', scan?.universe ?? '—'], ['READ', scan?.scanned ?? '—'], ['PASSED SHIELD', scan?.passedScreen ?? '—'], ['STRIKE', `RSI≤${s.dipRsi} · ≥${s.dipBelowPct}% UNDER`], ['STOP', `${s.dipStopPct}%`], ['STEPS', s.stepPct ? `+${s.stepPct}/+${s.stepPct * 2}%` : 'OFF'], ['TARGET', `+${s.targetPct}%`], ['CLOCK', `${s.holdHours}H`], ['MIN VOL', `$${(s.minVol1hUsd / 1000).toFixed(0)}K/H`], ['SLIPPAGE', `${(R.risk.slippageBps / 100).toFixed(1)}%`], ['FEE', '0%']];
-  $('ticker').replaceChildren(...parts.flatMap(([k, v], i) => [document.createTextNode(`${i ? ' · ' : ''}${k} `), el('b', '', String(v))]));
+  const R = rules(), s = R.settings, parts = [['MODE', state.mode === 'live' ? 'LIVE' : 'PRACTICE'], ['STRENGTH', state.preset.toUpperCase()], ['WATCHED', scan?.universe ?? '—'], ['READ', scan?.scanned ?? '—'], ['PASSED SHIELD', scan?.passedScreen ?? '—'], ['STRIKE', `RSI≤${s.dipRsi} · ≥${s.dipBelowPct}% UNDER`], ['STOP', `${s.dipStopPct}%`], ['STEPS', s.stepPct ? `+${s.stepPct}/+${s.stepPct * 2}%` : 'OFF'], ['TARGET', `+${s.targetPct}%`], ['CLOCK', `${s.holdHours}H`], ['MIN VOL', `$${(s.minVol1hUsd / 1000).toFixed(0)}K/H`], ['SLIPPAGE', `${(R.risk.slippageBps / 100).toFixed(1)}%`], ['FEE', '0%'], ['ROUND', impi.rounds || '—'], ['SCAN', impi.scanMs ? `${Math.round(impi.scanMs)}MS` : '—'], ['IN ZONE', (scan?.results ?? []).filter((t) => t.analysis?.decision === 'enter').length]];
+  const run = () => { const s = el('span', 'tick-set'); s.append(...parts.flatMap(([k, v]) => [document.createTextNode(`${k} `), el('b', '', String(v)), document.createTextNode('  ·  ')])); return s; };
+  $('ticker').replaceChildren(run(), run());
 }
 
 // ---------- equity, stats and positions ----------
@@ -54,13 +77,20 @@ async function drawMoney() {
   $('s-trades').textContent = String(whole.length); $('s-win').textContent = whole.length ? `${Math.round(won.length / whole.length * 100)}%` : '—';
   const sum = mine.reduce((n, t) => n + t.pnlSol, 0), put = mine.reduce((n, t) => n + t.solIn, 0); $('s-avg').textContent = put ? pct(sum / put * 100) : '—';
   const open = state.positions.filter((p) => p.mode === state.mode); $('s-open').textContent = String(open.length);
+  const pcts = whole.map((t) => t.pnlPct), gains = mine.filter((t) => t.pnlSol > 0).reduce((n, t) => n + t.pnlSol, 0), losses = -mine.filter((t) => t.pnlSol < 0).reduce((n, t) => n + t.pnlSol, 0), held = whole.filter((t) => t.openedAt).map((t) => (t.closedAt - t.openedAt) / 60000);
+  $('s-best').textContent = pcts.length ? pct(Math.max(...pcts)) : '—'; $('s-worst').textContent = pcts.length ? pct(Math.min(...pcts)) : '—';
+  $('s-pf').textContent = losses > 0 ? (gains / losses).toFixed(2) : gains > 0 ? '∞' : '—'; $('s-hold').textContent = held.length ? `${Math.round(held.reduce((a, b) => a + b, 0) / held.length)}m` : '—';
+  $('s-best').className = 'up'; $('s-worst').className = 'down';
   $('positions').replaceChildren(...(open.length ? open.map((p) => { const tr = el('tr'), now = Number.isFinite(p.nowSol) ? p.nowSol : p.solIn, g = (now / p.solIn - 1) * 100, b = el('button', 'sell', 'Sell'); b.type = 'button';
     b.addEventListener('click', async () => { b.disabled = true; try { await sell(p, 'manual'); } catch (e) { emit('say', { who: 'induna', text: `${p.symbol}: ${e.message}`, tone: 'down' }); } void drawMoney(); });
     const name = el('a', '', `${p.symbol}${p.dip ? ' · dip' : ''}`); name.href = `https://dexscreener.com/solana/${p.mint}`; name.target = '_blank'; name.rel = 'noopener';
-    tr.append(el('td'), el('td', '', p.solIn.toFixed(4)), el('td', '', now.toFixed(4)), el('td', g >= 0 ? 'up' : 'down', pct(g)), el('td', '', '')); tr.firstChild.append(name); tr.lastChild.append(b); return tr; })
-    : [(() => { const tr = el('tr'), td = el('td', 'small', 'Nothing open. The impi buys only in the strike zone.'); td.colSpan = 5; tr.append(td); return tr; })()]));
+    const px = p.last ?? p.entry, toStop = (p.stop / px - 1) * 100, toTgt = (p.target / px - 1) * 100, span = el('td', 'range'), bar = el('span', 'rbar'), mark = el('i'), at = Math.max(0, Math.min(1, (px - p.stop) / ((p.target - p.stop) || 1)));
+    mark.className = `m${Math.round(at * 10)}`; bar.append(mark); span.append(el('span', 'down', pct(toStop)), bar, el('span', 'up', pct(toTgt)));
+    const mins = Math.round((Date.now() - p.openedAt) / 60000);
+    tr.append(el('td'), el('td', '', p.solIn.toFixed(4)), el('td', '', now.toFixed(4)), el('td', g >= 0 ? 'up' : 'down', pct(g)), span, el('td', '', `${mins}m`), el('td', '', '')); tr.firstChild.append(name); if (p.empty) tr.firstChild.append(el('span', 'tagx', 'POOL EMPTY')); tr.lastChild.append(b); return tr; })
+    : [(() => { const tr = el('tr'), td = el('td', 'small', 'Nothing open. The impi buys only in the strike zone.'); td.colSpan = 7; tr.append(td); return tr; })()]));
 }
-on('equity', drawMoney); on('positions', drawMoney); on('trade', drawMoney);
+on('equity', drawMoney); on('positions', drawMoney); on('trade', drawMoney); setInterval(() => { if (state.positions.length) void drawMoney(); }, 15_000);
 
 // ---------- controls ----------
 function drawControls() {

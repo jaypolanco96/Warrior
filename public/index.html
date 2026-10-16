@@ -32,7 +32,7 @@
 
   <section class="card flow" aria-labelledby="flow-h">
     <h2 id="flow-h" class="label">ORDER FLOW · WATCHED COINS</h2>
-    <table class="book"><thead><tr><th>COIN</th><th>5M</th><th>1H</th><th>VOL 1H</th></tr></thead><tbody id="flow"></tbody></table>
+    <table class="book"><thead><tr><th>COIN</th><th>5M</th><th>1H</th><th>VS AVG</th><th>VOL 1H</th></tr></thead><tbody id="flow"></tbody></table>
   </section>
 
   <!-- centre: the impi -->
@@ -58,6 +58,7 @@
     <div class="big"><span id="equity">—</span><span id="pnl-change" class="chg"></span></div>
     <canvas id="pnl-chart" class="chart" aria-label="Equity over time" role="img"></canvas>
     <dl class="stats"><dt>TRADES</dt><dd id="s-trades">0</dd><dt>WIN RATE</dt><dd id="s-win">—</dd><dt>AVG / TRADE</dt><dd id="s-avg">—</dd><dt>OPEN</dt><dd id="s-open">0</dd></dl>
+    <dl class="stats"><dt>BEST</dt><dd id="s-best">—</dd><dt>WORST</dt><dd id="s-worst">—</dd><dt>PROFIT FACTOR</dt><dd id="s-pf">—</dd><dt>AVG HOLD</dt><dd id="s-hold">—</dd></dl>
   </section>
 
   <section class="card dist" aria-labelledby="dist-h">
@@ -68,7 +69,7 @@
 
   <section class="card positions" aria-labelledby="pos-h">
     <h2 id="pos-h" class="label">POSITIONS</h2>
-    <table class="book"><thead><tr><th>COIN</th><th>IN</th><th>NOW</th><th>P/L</th><th></th></tr></thead><tbody id="positions"></tbody></table>
+    <table class="book"><thead><tr><th>COIN</th><th>IN</th><th>NOW</th><th>P/L</th><th>STOP · PRICE · TARGET</th><th>HELD</th><th></th></tr></thead><tbody id="positions"></tbody></table>
     <div class="row"><button id="out" class="btn ghost" type="button">Get me out: sell everything</button><button id="csv" class="btn ghost" type="button">Download history (CSV)</button><button id="reset" class="btn ghost" type="button">Reset practice</button></div>
   </section>
 
