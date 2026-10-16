@@ -21,7 +21,8 @@ export const impi = { get running() { return running; }, get lastScan() { return
 const say = (who, text, tone) => emit('say', { who, text, tone });
 on('say', ({ who }) => fire(who));
 
-function rollDay(equity) { const d = new Date().toISOString().slice(0, 10); if (state.day !== d || !Number.isFinite(state.dayStart)) { state.day = d; state.dayStart = equity; } }
+// The day's starting equity, kept per mode: practice and live money are never mixed.
+function rollDay(equity) { const d = new Date().toISOString().slice(0, 10), k = state.mode; state.days ??= {}; if (state.days[k]?.day !== d || !Number.isFinite(state.days[k]?.start)) state.days[k] = { day: d, start: equity }; return state.days[k].start; }
 
 async function round() {
   if (busy) return; busy = true;
@@ -40,8 +41,8 @@ async function round() {
     const owned = new Set(open.map((p) => p.mint)), picks = read.filter((t) => t.analysis?.decision === 'enter' && !owned.has(t.mint) && !((state.cooldown[t.mint] ?? 0) > Date.now()) && !(t.analysis.style === 'smart' && live()));
     say('umkhonto', picks.length ? `Strike: ${picks.map((t) => `${t.symbol} (${t.analysis.dipNote ?? t.analysis.smartNote ?? 'signals agree'})`).join('; ')}.` : 'No coin is in the strike zone. Waiting is a position too.');
     // 5. the commander
-    const bal = await balance(), equity = bal + heldSol(); rollDay(equity);
-    const down = (state.dayStart - equity) / state.dayStart * 100;
+    const bal = await balance(), equity = bal + heldSol(), start = rollDay(equity);
+    const down = start > 0 ? (start - equity) / start * 100 : 0;
     if (down >= R.risk.dailyLossLimitPct) say('induna', `Down ${down.toFixed(1)}% today: the ${R.risk.dailyLossLimitPct}% limit is reached. No new trades until tomorrow.`, 'down');
     else if (open.length >= R.risk.maxOpenPositions) say('induna', `Holding ${open.length}, the most ${state.preset} allows.`);
     else for (const t of picks) { if (state.positions.filter((p) => p.mode === state.mode).length >= R.risk.maxOpenPositions || !running) break; try { await buy(t, R); } catch (e) { say('induna', `${t.symbol}: buy failed (${e.message}). Nothing spent.`, 'down'); } }

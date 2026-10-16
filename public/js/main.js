@@ -14,7 +14,7 @@ const money = (n) => !Number.isFinite(n) ? '—' : n >= 1e6 ? `$${(n / 1e6).toFi
 // ---------- agents and the live feed ----------
 const said = {};
 function drawAgents() {
-  $('agents').replaceChildren(...AGENTS.map((a, i) => { const li = el('li', `agent ${Date.now() - (said[a.id]?.at ?? 0) < 4000 ? 'busy' : ''}`), dot = el('span', 'dot'); dot.dataset.i = String(i); li.style && null;
+  $('agents').replaceChildren(...AGENTS.map((a, i) => { const li = el('li', `agent ${Date.now() - (said[a.id]?.at ?? 0) < 4000 ? 'busy' : ''}`), dot = el('span', 'dot'); dot.dataset.i = String(i);
     const body = el('div'); body.append(el('b', '', `${a.glyph} ${a.name.toUpperCase()}`), el('div', 'role', `${a.role} · ${a.job}`), el('div', 'say', said[a.id]?.text ?? 'Ready.')); li.append(dot, body); return li; }));
   document.querySelectorAll('.agent .dot').forEach((d) => d.classList.add(`c${d.dataset.i}`));
 }
@@ -76,7 +76,24 @@ $('go').addEventListener('click', () => {
   if (state.mode === 'live' && Date.now() - armed > 6000) { armed = Date.now(); $('go').textContent = 'Tap again: this trades REAL SOL'; setTimeout(drawControls, 6000); return; }
   const why = start(); if (why) emit('say', { who: 'induna', text: why, tone: 'down' }); drawControls();
 });
-$('out').addEventListener('click', async () => { if (!state.positions.some((p) => p.mode === state.mode)) return; $('out').disabled = true; try { await sellAll(); } finally { $('out').disabled = false; void drawMoney(); } });
+let outArmed = 0;
+$('out').addEventListener('click', async () => {
+  if (!state.positions.some((p) => p.mode === state.mode)) { emit('say', { who: 'induna', text: 'Nothing is open to sell.' }); return; }
+  // Live: a second tap within six seconds, so one stray tap never sells real positions.
+  if (state.mode === 'live' && Date.now() - outArmed > 6000) { outArmed = Date.now(); $('out').textContent = 'Tap again: sell every LIVE position now'; setTimeout(() => { $('out').textContent = 'Get me out: sell everything'; }, 6000); return; }
+  $('out').disabled = true; try { await sellAll(); } finally { $('out').disabled = false; $('out').textContent = 'Get me out: sell everything'; void drawMoney(); }
+});
+// The full history as a spreadsheet file: every sale, its costs already inside the result, practice and live marked.
+$('csv').addEventListener('click', () => {
+  const rows = [['closed_at_utc', 'mode', 'coin', 'kind', 'sol_in', 'sol_out', 'result_sol', 'result_pct', 'why_closed', 'part_sale', 'opened_at_utc', 'minutes_held', 'rules_version', 'coin_address'], ...state.trades.map((t) => [new Date(t.closedAt).toISOString(), t.mode === 'live' ? 'live' : 'practice', t.symbol, t.style ?? '', t.solIn.toFixed(6), t.solOut.toFixed(6), t.pnlSol.toFixed(6), t.pnlPct.toFixed(2), t.reason, t.partial ? 'yes' : 'no', t.openedAt ? new Date(t.openedAt).toISOString() : '', t.openedAt ? ((t.closedAt - t.openedAt) / 60000).toFixed(1) : '', t.rules ?? '', t.mint])];
+  const csv = rows.map((r) => r.map((v) => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v)).join(',')).join('\n'), a = el('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `warrior-trades-${new Date().toISOString().slice(0, 10)}.csv`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+$('reset').addEventListener('click', () => {
+  if (impi.running || state.mode !== 'paper') { emit('say', { who: 'umlobi', text: 'Practice can be reset in practice mode, with the impi resting.' }); return; }
+  state.paperSol = 1; state.positions = state.positions.filter((p) => p.mode !== 'paper'); state.trades = state.trades.filter((t) => t.mode !== 'paper'); state.equity = state.equity.filter((e) => e.mode !== 'paper'); if (state.days) delete state.days.paper; save();
+  emit('say', { who: 'umlobi', text: 'Practice reset to a pretend 1 SOL.' }); void drawMoney();
+});
 $('connect').addEventListener('click', async () => { try { if (owner.address) await disconnectPhantom(); else await connectPhantom(); } catch (e) { emit('say', { who: 'induna', text: e.message, tone: 'down' }); } drawControls(); drawWallet(); });
 on('running', drawControls); on('wallet', () => { drawControls(); drawWallet(); });
 

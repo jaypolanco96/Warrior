@@ -72,7 +72,7 @@ export async function sell(p, reason, fraction = 1) {
   const cost = whole ? p.solIn : p.solIn * fraction, pnl = out - cost;
   state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, solIn: cost, solOut: out, pnlSol: pnl, pnlPct: pnl / cost * 100, reason, style: p.style, partial: !whole, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules });
   if (whole) { state.positions = state.positions.filter((x) => x !== p); state.cooldown[p.mint] = Math.max(Date.now() + (pnl < 0 ? 120 : 30) * 60_000, p.dip === 1 ? p.openedAt + 6 * 3_600_000 : 0); }
-  else { p.solIn -= cost; p.tokenRaw = (held - raw).toString(); }
+  else { p.solIn -= cost; p.tokenRaw = (held - raw).toString(); delete p.nowSol; } // the old value was for the whole position
   save(); emit('trade', { side: 'sell', symbol: p.symbol, pnl });
   say('umlobi', `SELL ${p.symbol}${whole ? '' : ` (${Math.round(fraction * 100)}%)`}: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} SOL (${(pnl / cost * 100).toFixed(1)}%) · ${reason}.`, pnl >= 0 ? 'up' : 'down');
   return true;
