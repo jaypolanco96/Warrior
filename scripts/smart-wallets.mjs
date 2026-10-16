@@ -5,7 +5,7 @@
 //   2. Note the wallets that bought in the 20 minutes before each pump, and at ordinary moments (no +10% in two hours).
 //   3. Keep the wallets that bought before pumps on two or more coins and never at an ordinary moment.
 import { writeFileSync } from 'node:fs';
-const SITE = process.env.WARRIOR_SITE || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'https://WARRIOR_HOST'), MAX_COINS = Number(process.env.SMART_COINS) || 40;
+const SITE = process.env.WARRIOR_SITE || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'https://warrior-liart.vercel.app'), MAX_COINS = Number(process.env.SMART_COINS) || 40;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now();
 const get = async (u) => { for (let i = 0; i < 3; i++) { try { const r = await fetch(u, { signal: AbortSignal.timeout(10000) }); if (r.status === 429) { await sleep(4000 * (i + 1)); continue; } if (r.ok) return await r.json(); } catch { /* retry */ } await sleep(1000); } return null; };
 
