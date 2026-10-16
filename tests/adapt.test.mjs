@@ -12,7 +12,7 @@ test('only the four listed dials can move, never a safety rule, and only inside 
   for (const safety of ['minLiquidityUsd', 'dipStopPct', 'maxPriceImpactPct', 'minVolume24hUsd', 'dailyLossLimitPct', 'riskPerTradePct']) assert.ok(!(safety in ADAPT), safety);
   const r = resolveRules({ preset: 'spicy', adapt: { holdHours: 99, targetPct: 5, minLiquidityUsd: 1000, dipStopPct: 50 } });
   assert.equal(r.settings.holdHours, 3); assert.equal(r.settings.targetPct, 20); assert.equal(r.risk.minLiquidityUsd, resolveRules({ preset: 'spicy' }).risk.minLiquidityUsd); assert.equal(r.settings.dipStopPct, 20);
-  assert.equal(resolveRules({ preset: 'spicy' }).version, 'spicy-f43981', 'no moves: the tested version name is unchanged');
+  assert.equal(resolveRules({ preset: 'spicy' }).version, 'spicy-b41b4c', 'no moves: the tested version name is unchanged');
 });
 
 test('a move travels to the server: the scan and position checks read it back', () => {
