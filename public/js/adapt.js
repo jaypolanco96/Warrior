@@ -8,6 +8,7 @@
 // Evidence comes from the trade history and the watchtower (watch.js). Everything is written to the history below.
 import { state, save, emit, on } from './store.js';
 import { ADAPT, resolveRules } from '/vendor/lib/presets.js';
+import { evidence as decide, judge as verdictOf, baselineOf, perDayOf } from '/vendor/lib/adapt.js';
 import { afterByReason, missedByRule } from './watch.js';
 
 const H = 3_600_000, DAY = 24 * H, $ = (id) => document.getElementById(id);
@@ -33,43 +34,24 @@ export function positions(preset = state.preset, since = Date.now() - 14 * DAY) 
   return [...map.values()].filter((p) => p.done && p.closedAt >= since).map((p) => ({ ...p, pct: p.pnl / p.solIn * 100 })).sort((a, b) => a.closedAt - b.closedAt);
 }
 
-/** What the evidence says right now: a list of { key, to, why } moves, strongest first. */
+/** What the evidence says right now (lib/adapt.mjs decides; this only gathers the inputs). */
 export function evidence(preset = state.preset) {
-  const P = positions(preset), after = afterByReason(preset), missed = missedByRule(preset), out = [];
-  const v = (k) => value(preset, k), step = (k, dir) => { const t = ADAPT[k], to = v(k) + dir * t.step; return to >= t.min && to <= t.max ? to : null; };
-  const push = (key, dir, why, strength) => { const to = step(key, dir); if (to !== null) out.push({ key, from: v(key), to, why, strength }); };
-  // the clock
-  const clock = P.filter((p) => p.reason === 'time'), ac = after.time;
-  if (clock.length >= 8 && avg(clock, (p) => p.pct) <= -2 && ac?.n >= 5 && ac.end <= 0) push('holdHours', -1, `${clock.length} positions sold by the ${v('holdHours')}-hour clock averaged ${pct(avg(clock, (p) => p.pct))}, and those coins kept falling after (${pct(ac.end)} 3 h later). Sell sooner.`, 2);
-  if (ac?.n >= 6 && ac.end >= 3 && ac.max >= 8) push('holdHours', 1, `Coins sold by the clock went on to ${pct(ac.max)} at their high and ${pct(ac.end)} 3 h later (${ac.n} sales). Hold an hour longer.`, 2);
-  // the target
-  const at = after.target, tgt = v('targetPct'), close = P.filter((p) => Number.isFinite(p.peakPct) && p.peakPct >= tgt - 8 && p.peakPct < tgt);
-  if (at?.n >= 5 && at.max >= 15 && at.end >= 5) push('targetPct', 1, `After hitting the +${tgt}% target, coins kept rising: ${pct(at.max)} at their high, ${pct(at.end)} 3 h later (${at.n} sales). Aim higher.`, 1);
-  if (P.length >= 20 && P.filter((p) => p.reason === 'target').length <= 1 && close.length >= 5) push('targetPct', -1, `Only ${P.filter((p) => p.reason === 'target').length} of ${P.length} positions reached +${tgt}%, while ${close.length} peaked within 8 points of it and turned back. Aim a little lower.`, 1);
-  // re-buying after a loss
-  const wait = v('lossCooldownMinutes'), rebuys = P.filter((p) => P.some((q) => q.mint === p.mint && q.pct < 0 && q.closedAt < p.openedAt && p.openedAt - q.closedAt < 12 * H));
-  if (rebuys.length >= 5 && rebuys.filter((p) => p.pct < 0).length / rebuys.length >= 0.7) push('lossCooldownMinutes', 1, `${rebuys.filter((p) => p.pct < 0).length} of ${rebuys.length} re-buys of a coin that had just lost lost again. Wait ${(wait + 120) / 60} h instead of ${wait / 60} h.`, 3);
-  // how deep a dip
-  const below = v('dipBelowPct'), known = P.filter((p) => Number.isFinite(p.depthPct)), shallow = known.filter((p) => -p.depthPct < below + 2), deep = known.filter((p) => -p.depthPct >= below + 2);
-  if (shallow.length >= 8 && deep.length >= 5 && avg(shallow, (p) => p.pct) <= -1 && avg(deep, (p) => p.pct) >= avg(shallow, (p) => p.pct) + 3) push('dipBelowPct', 1, `Dips bought just past the ${below}% line averaged ${pct(avg(shallow, (p) => p.pct))} (${shallow.length}); deeper ones averaged ${pct(avg(deep, (p) => p.pct))} (${deep.length}). Wait for deeper dips.`, 2);
-  const nearMiss = (missed.depth?.list ?? []).filter((x) => Number.isFinite(x.gap) && x.gap <= 2);
-  if (nearMiss.length >= 10 && avg(nearMiss, (x) => x.result) >= 3) push('dipBelowPct', -1, `${nearMiss.length} coins that missed the ${below}% line by 2 points or less would have averaged ${pct(avg(nearMiss, (x) => x.result))} after costs. Accept slightly shallower dips.`, 1);
-  return out.sort((a, b) => b.strength - a.strength);
+  return decide({ positions: positions(preset), after: afterByReason(preset), missed: missedByRule(preset), value: (k) => value(preset, k) });
 }
 
 function record(b, entry) { b.history.push({ at: Date.now(), ...entry }); while (b.history.length > 60) b.history.shift(); }
 function apply(preset, move, by) {
-  const b = book(preset), P = positions(preset), before = P.slice(-10);
+  const b = book(preset);
   b.dials[move.key] = move.to; b.last = Date.now(); b.proposal = null;
-  b.probation = { key: move.key, from: move.from, to: move.to, at: Date.now(), base: before.length >= 5 ? avg(before, (p) => p.pct) : null };
+  b.probation = { key: move.key, from: move.from, to: move.to, at: Date.now(), base: baselineOf(positions(preset)), perDay: perDayOf(positions(preset)) };
   record(b, { kind: 'change', key: move.key, from: move.from, to: move.to, why: move.why, by });
   save(); emit('rules-changed'); draw();
   emit('say', { who: 'induna', text: `Self-ruling: ${ADAPT[move.key].label} ${UNITS[move.key](move.from)} → ${UNITS[move.key](move.to)}. ${move.why} On probation for the next 8 trades.` });
 }
 function judge(preset) {
   const b = book(preset), pr = b.probation; if (!pr) return;
-  const after = positions(preset).filter((p) => p.openedAt >= pr.at); if (after.length < 8) return;
-  const now = avg(after, (p) => p.pct), worse = pr.base === null ? now < -3 : now < pr.base - 1.5;
+  const v = verdictOf({ positions: positions(preset), probation: pr }); if (!v) return;
+  const now = v.now, worse = v.verdict === 'revert', after = { length: v.n };
   if (worse) {
     const r0 = resolveRules({ preset }), base = ADAPT[pr.key].of === 'settings' ? r0.settings[pr.key] : r0.risk[pr.key];
     if (pr.from === base) delete b.dials[pr.key]; else b.dials[pr.key] = pr.from;
