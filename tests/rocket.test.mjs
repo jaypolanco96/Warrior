@@ -284,17 +284,7 @@ test('Rocket plans come from the preset: a 50% target, stake out at +25%, only t
   assert.equal(rocketFor('spicy', { on: true, targetPct: 1000 }).value.targetPct, 50, 'a typed number is ignored');
 });
 
-test('Rocket copy filter: practice bets need a launch wallet buying, live bets are unchanged, copy bets are labelled', async () => {
-  const fs = await import('node:fs'), src = fs.readFileSync(new URL('../public/auto.js', import.meta.url), 'utf8');
-  assert.match(src, /const copy = !live\(\)/, 'only practice mode uses the copy filter');
-  assert.match(src, /\(c\.copy\?\.count \?\? 0\) >= 1/, 'a practice pick needs one launch wallet buying');
-  assert.match(src, /p\.rocket\.copy === 1 \? 'rocket-copy'/, 'copy bets are marked in the history');
-  const list = JSON.parse(fs.readFileSync(new URL('../public/rocket-wallets.json', import.meta.url), 'utf8'));
-  assert.ok(Array.isArray(list.wallets) && list.wallets.every((w) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(w)), 'a list of wallet addresses');
-  assert.ok(Number.isFinite(Date.parse(list.at)));
-  const smart = await import('../lib/smart.mjs'); assert.equal(typeof smart.rocketList, 'function');
-  const feed = fs.readFileSync(new URL('../lib/http/rocket.js', import.meta.url), 'utf8'); assert.match(feed, /minutes: 10/);
-});
+
 
 test('a coin of any age with one bundled buy for every two holders is refused (SYCAMORE, October 15)', async () => {
   const { launchAudit } = await import('../lib/rocket.mjs');

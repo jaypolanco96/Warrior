@@ -3,26 +3,14 @@
   "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Warrior: a Solana meme-coin trading app and bot with technical analysis, regime, confluence and risk limits.",
+  "description": "Warrior: an impi of six AI agents trading Solana meme and ecosystem coins with tested rules. No profit is promised.",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "coin": "node scripts/coin.mjs",
-    "coin:native": "node scripts/coin-native.mjs",
-    "coin:launch": "node scripts/coin-launch-server.mjs",
-    "coin:check": "node scripts/coin-check.mjs",
-    "coin:stress": "node scripts/coin-stress.mjs",
-    "coin:selftest": "node scripts/coin-selftest.mjs",
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
-    "scan": "node bot/scan.mjs",
-    "bot": "node --env-file-if-exists=.env bot/warrior-bot.mjs",
-    "bot:selftest": "node --env-file-if-exists=.env bot/warrior-bot.mjs --selftest",
-    "bot:live": "node --env-file-if-exists=.env bot/warrior-bot.mjs --live",
-    "wallet": "node bot/wallet.mjs",
-    "dev": "vercel dev",
-    "warrior": "node --env-file-if-exists=.env bot/warrior.mjs"
+    "dev": "vercel dev"
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.4"

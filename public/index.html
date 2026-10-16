@@ -3,400 +3,94 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Warrior — Solana meme &amp; ecosystem coin trader</title>
-<meta name="description" content="Warrior scans Solana meme coins and pump.fun coins with technical analysis, regime, confluence and risk limits, and trades them from your own wallet." />
+<title>Warrior — an impi of AI agents trading Solana</title>
+<meta name="description" content="Warrior: six AI agents working as one impi to trade Solana meme and ecosystem coins. Tested rules, a strict shield, practice money first. No profit is promised." />
 <link rel="icon" href="/favicon-32.png" sizes="32x32" />
 <link rel="icon" href="/logo.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 <link rel="manifest" href="/manifest.webmanifest" />
 <meta name="theme-color" content="#fff8ec" />
-<link rel="stylesheet" href="/style.css" />
+<link rel="stylesheet" href="/warrior.css" />
 </head>
 <body>
-<div id="joy-layer" class="joy-layer" aria-hidden="true"></div>
-<div id="joy-toast" class="joy-toast" hidden></div>
-<div id="joy-live" class="sr-only" aria-live="polite"></div>
-<header class="top">
-  <a class="brand" href="/" aria-label="Warrior home"><span class="emoji" id="mascot" aria-hidden="true">😄</span><span class="word">Warrior</span></a>
-  <div class="wallet">
-    <span id="wallet-info" class="wallet-info" aria-live="polite"></span>
-    <button id="connect" class="btn neon">Connect wallet</button>
+<header class="masthead">
+  <a class="mark" href="/" aria-label="Warrior home"><img src="/logo.svg" alt="" width="52" height="52" /><span>WARRIOR</span></a>
+  <div class="tag">QUANT × IMPI · SOLANA · 5M</div>
+  <div class="actions">
+    <span id="phantom-info" class="small"></span>
+    <button id="connect" class="btn">Connect Phantom</button>
   </div>
 </header>
-<p id="mascot-line" class="mascot-line" aria-live="polite"></p>
-<div id="status-line" class="status-line" role="status">
-  <span id="status-text">Checking the data sources…</span>
-  <button id="status-toggle" class="btn small" type="button" aria-expanded="false" aria-controls="status-list">Details</button>
-  <ul id="status-list" class="status-list" hidden></ul>
-</div>
+<div class="ticker" aria-label="Live system figures"><div id="ticker" class="ticker-run"></div></div>
 
-
-<main>
-  <section class="hero">
-    <h1>Hunt the dips.<br /><span class="glow">Fight with rules.</span></h1>
-    <p>Warrior scans Solana meme and ecosystem coins, buys only tested deep dips on busy coins that pass a strict safety screen, and banks profit in steps. Practice money first; no profit is promised.</p>
-    <div class="row feel">
-      <button id="welcome-open" class="btn" type="button">👋 Tour</button>
-      <button id="preview-win" class="btn" type="button">💖 A win</button>
-      <button id="story-open" class="btn" type="button">📖 My day</button>
-      <button id="sound-toggle" class="btn" type="button" aria-pressed="false">🔕 Sound off</button>
-    </div>
-    <p class="warn"><b>Real money, real risk.</b> Meme coins can fall to nothing in minutes. No profit is promised. <a href="/risk">Read the risks.</a></p>
+<main class="desk">
+  <!-- left column -->
+  <section class="card agents" aria-labelledby="agents-h">
+    <h2 id="agents-h" class="label">IMPI · SIX AGENTS</h2>
+    <ul id="agents" class="agent-list"></ul>
   </section>
 
-  <nav class="jump" aria-label="Jump to a tool">
-    <a href="#lookup-title">Look up</a><a href="#trend-title">Trending</a><a href="#scan-title">Scanner</a><a href="#auto-title">Auto-trade</a><a href="#list-title">Orders</a><a href="#dial-title">Rules</a><a href="#pf-title">Portfolio</a><a href="#follow-title">Follow</a><a href="#score-title">Scorecard</a><a href="#league-title">League</a><a href="#rules-title">How it works</a>
-  </nav>
-
-  <section class="panel" aria-labelledby="lookup-title">
-    <div class="panel-head"><h2 id="lookup-title">Look up any coin</h2></div>
-    <div class="row lookup">
-      <label class="sr-only" for="lookup-q">Coin name, ticker or address</label>
-      <input id="lookup-q" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60" placeholder="bonk, WIF, or paste an address" />
-      <button id="lookup-go" class="btn neon" type="button">Ask Warrior</button>
-    </div>
-    <p id="lookup-status" class="muted" role="status"></p>
-    <div id="lookup-result" class="cards"></div>
+  <section class="card flow" aria-labelledby="flow-h">
+    <h2 id="flow-h" class="label">ORDER FLOW · WATCHED COINS</h2>
+    <table class="book"><thead><tr><th>COIN</th><th>5M</th><th>1H</th><th>VOL 1H</th></tr></thead><tbody id="flow"></tbody></table>
   </section>
 
-  <section class="panel" data-fold="phone" aria-labelledby="trend-title">
-    <div class="panel-head"><h2 id="trend-title">Trending now</h2>
-      <div class="controls" role="group" aria-label="Trending over">
-        <button class="btn small trend-window" type="button" data-window="5m" aria-pressed="false">5 min</button>
-        <button class="btn small trend-window" type="button" data-window="1h" aria-pressed="true">1 hour</button>
-        <button class="btn small trend-window" type="button" data-window="6h" aria-pressed="false">6 hours</button>
-        <button class="btn small trend-window" type="button" data-window="24h" aria-pressed="false">24 hours</button>
+  <!-- centre: the impi -->
+  <section class="card core" aria-labelledby="core-h">
+    <div class="core-head">
+      <div>
+        <h1 id="core-h" class="headline">Six agents.<br /><em>One shield.</em></h1>
+        <p class="small">Each agent has one job. A coin is only bought when the scout, the shield, the spear and the commander all agree.</p>
+      </div>
+      <div class="mode">
+        <div class="seg" role="group" aria-label="Mode"><button id="mode-paper" class="seg-b on" type="button">Practice</button><button id="mode-live" class="seg-b" type="button">Live</button></div>
+        <div class="seg" role="group" aria-label="Strength"><button class="seg-b preset" data-preset="chill" type="button">Chill</button><button class="seg-b preset" data-preset="balanced" type="button">Balanced</button><button class="seg-b preset" data-preset="spicy" type="button">Spicy</button></div>
+        <button id="go" class="btn go" type="button">Send the impi</button>
       </div>
     </div>
-    <p class="muted">Most traded right now. Trending is not a signal: these often fall as fast as they rose.</p>
-    <p id="trend-status" class="muted" role="status">Loading what is trending…</p>
-    <div id="trend-list" class="rows"></div>
+    <canvas id="net" class="net" aria-label="The six agents around the impi's shield, lighting up as they work" role="img"></canvas>
+    <p id="core-line" class="core-line" aria-live="polite">The impi is resting.</p>
   </section>
 
-  <section class="panel" aria-labelledby="scan-title">
-    <div class="panel-head">
-      <h2 id="scan-title" class="tabs" role="tablist" aria-label="Which scanner">
-        <button type="button" class="tab on" role="tab" aria-selected="true" data-scan-tab="live">Live scanner</button>
-        <button type="button" class="tab" role="tab" aria-selected="false" data-scan-tab="rocket">🚀 Rocket scanner</button>
-      </h2>
-      <div class="controls">
-        <label class="toggle" id="mature-wrap"><input type="checkbox" id="mature" /> Include mature coins (JUP, RAY, BONK, WIF…)</label>
-        <button id="rescan" class="btn">Scan now</button>
-      </div>
-    </div>
-    <p id="scan-status" class="muted" role="status">Scanning…</p>
-    <div id="results" class="cards"></div>
-    <div id="results-more"></div>
-    <p id="rocket-scan-status" class="muted" role="status" hidden>Looking at the newest launches…</p>
-    <div id="rocket-scan" class="cards" hidden></div>
-    <div id="rocket-scan-more" hidden></div>
+  <!-- right column -->
+  <section class="card pnl" aria-labelledby="pnl-h">
+    <h2 id="pnl-h" class="label">EQUITY · <span id="pnl-mode">PRACTICE</span></h2>
+    <div class="big"><span id="equity">—</span><span id="pnl-change" class="chg"></span></div>
+    <canvas id="pnl-chart" class="chart" aria-label="Equity over time" role="img"></canvas>
+    <dl class="stats"><dt>TRADES</dt><dd id="s-trades">0</dd><dt>WIN RATE</dt><dd id="s-win">—</dd><dt>AVG / TRADE</dt><dd id="s-avg">—</dd><dt>OPEN</dt><dd id="s-open">0</dd></dl>
   </section>
 
-  <section class="panel" aria-labelledby="pos-title">
-    <div class="panel-head"><h2 id="pos-title">My positions</h2></div>
-    <div id="positions" class="cards"><p class="muted">No positions yet.</p></div>
+  <section class="card dist" aria-labelledby="dist-h">
+    <h2 id="dist-h" class="label">DIP CURVE · DISTANCE FROM 20-CANDLE AVERAGE</h2>
+    <canvas id="dist-chart" class="chart" aria-label="How far the watched coins sit under or over their average" role="img"></canvas>
+    <p class="small">The spear only strikes in the deep tail on the left: 8–10% under the average, RSI 35 or lower, on a busy coin.</p>
   </section>
 
-  <section class="panel auto" aria-labelledby="auto-title">
-    <div class="panel-head"><h2 id="auto-title">Auto-trade in this tab</h2><span class="pill">WHILE THIS TAB IS OPEN</span></div>
-    <p><b>Practice first:</b> a pretend 0.5 SOL, real prices, no wallet needed.</p>
-    <details class="more"><summary>How practice and live trading work</summary><p>Press <b>Practice buy</b> on any coin, or let Warrior trade the pretend money by itself here.</p><p>For real trading, your Phantom wallet asks you to approve every transaction, so it cannot trade while you are away. Live auto-trading uses a separate small <b>trading wallet</b> that lives in this browser. You move SOL into it once, and Warrior then buys and sells by the rules for as long as this tab stays open.</p></details>
-    <div id="auto-create">
-      <p class="warn"><b>Read this first.</b> The trading wallet's key is stored in this browser only, locked with a passphrase you choose. Once you unlock it, a locked copy is also kept on Warrior's server so your other devices can open it with the same passphrase; the passphrase never leaves your device. Still save the backup key: it is the only way back if you forget the passphrase. Anyone with the backup key controls the wallet. Keep only money you are willing to lose in it.</p>
-      <div class="row"><button id="auto-create-btn" class="btn neon" type="button">Create my trading wallet</button><button id="auto-restore" class="btn" type="button">Restore from a backup key</button></div>
-    </div>
-    <div id="auto-body">
-      <dl class="sum wide">
-        <dt id="auto-wallet-label">Trading wallet</dt><dd id="auto-wallet-row"><code id="auto-address"></code> <span id="auto-lock" class="pill" hidden></span></dd>
-        <dt>Balance</dt><dd><span id="auto-balance">—</span> <button id="auto-refresh" class="btn small" type="button">Refresh</button></dd>
-        <dt>Status</dt><dd><span id="auto-status" class="verdict wait">Stopped</span></dd>
-        <dt>Devices</dt><dd><span id="sync-status" class="muted"></span> <button id="sync-open" class="btn small" type="button">Open my wallet from another device</button></dd>
-        <dt>Results</dt><dd id="auto-summary">—</dd>
-      </dl>
-      <div id="auto-protect" class="warn" hidden>
-        <b>This wallet is not protected yet.</b> Its key sits in this browser without a lock. Choose a passphrase to encrypt it. Live trading stays off until you do.
-        <div class="row"><button id="auto-protect-btn" class="btn neon" type="button">Protect it with a passphrase</button></div>
-      </div>
-      <div id="auto-locked" class="warn" hidden>
-        <b>The trading wallet is locked.</b> Warrior cannot trade, sell or withdraw with it until you unlock it in this tab.
-        <div class="row"><button id="auto-unlock" class="btn neon" type="button">Unlock with passphrase</button><button id="auto-unlock-device" class="btn" type="button" hidden>Unlock with this device</button></div>
-      </div>
-      <div id="auto-backup-warn" class="warn">
-        <b>Save the backup key before you fund this wallet.</b> It is the only way back if this browser's data is cleared, this device is lost, or you forget the passphrase.
-        <div class="row"><button id="auto-backup" class="btn neon" type="button">Save my backup key (3 short steps)</button></div>
-      </div>
-      <div class="row">
-        <label class="inline">Mode
-          <select id="auto-mode"><option value="paper">Practice — pretend 0.5 SOL, nothing is sent</option><option value="live">Live — real funds</option></select>
-        </label>
-        <label class="toggle"><input type="checkbox" id="auto-mature" /> Include mature coins</label>
-      </div>
-      <div id="auto-live-tools" hidden>
-        <div class="row">
-          <label class="inline">Fund from Phantom (SOL) <input id="auto-fund-amount" type="number" min="0.05" max="5" step="0.01" value="0.2" /></label>
-          <button id="auto-fund" class="btn" type="button">Send to trading wallet</button>
-          <button id="auto-withdraw" class="btn" type="button">Withdraw all SOL to Phantom</button>
-        </div>
-        <div class="row">
-          <button id="auto-lock-btn" class="btn" type="button" hidden>Lock the wallet now</button>
-          <button id="auto-passkey" class="btn" type="button" hidden>Add a passkey for this device</button>
-          <button id="auto-passkey-off" class="btn" type="button" hidden>Remove the passkey</button>
-          <button id="auto-backup-again" class="btn" type="button" hidden>Show my backup key again</button>
-        </div>
-        <details>
-          <summary>Coin account rent</summary>
-          <p class="muted">The first time a wallet buys a coin, Solana sets aside about 0.002 SOL as rent for that coin's account. Selling the coin leaves the account empty but still open, with the rent inside. Closing the empty account returns the rent to this wallet. If you buy the same coin again later, the rent is set aside again.</p>
-          <label class="toggle"><input type="checkbox" id="reclaim-on" /> After each full sale, close the coin's empty account and bring the rent back</label>
-          <div class="row"><button id="reclaim-now" class="btn" type="button">Close my empty coin accounts now</button></div>
-          <p class="muted">Only accounts holding exactly zero are closed. This has not been used with real funds yet.</p>
-        </details>
-        <details>
-          <summary>Sweep winnings home</summary>
-          <p class="muted">After a sale, when nothing is open, Warrior can send the SOL above an amount you choose back to your main wallet. Less money sitting in a browser wallet is safer. It only ever sends to the address shown here, which is set from your connected wallet.</p>
-          <p>Send to: <code id="sweep-to">not set yet</code> <button id="sweep-use" class="btn small" type="button">Use my connected wallet</button></p>
-          <div class="fields"><div class="fieldwrap"><label for="sweep-keep">Keep this much SOL in the trading wallet</label><input id="sweep-keep" type="number" min="0.05" step="0.05" value="0.2" /></div></div>
-          <label class="toggle"><input type="checkbox" id="sweep-on" disabled /> Sweep automatically</label>
-        </details>
-      </div>
-      <label id="auto-ack-row" class="toggle" hidden><input type="checkbox" id="auto-ack" /> I understand Warrior will buy and sell with real funds from the trading wallet without asking me each time, and that it can lose money.</label>
-      <div class="row">
-        <button id="auto-start" class="btn neon" type="button">Start auto-trading</button>
-        <button id="auto-stop" class="btn sell" type="button" hidden>Stop</button>
-        <button id="auto-sell" class="btn" type="button">Sell everything here</button>
-        <button id="auto-reset" class="btn" type="button">Reset practice results</button>
-        <button id="auto-reset-day" class="btn" type="button" title="Start today's count again: the daily loss limit and Rocket's bets per day. Your trade history is kept.">Reset the day</button>
-      </div>
-      <details id="rocket">
-        <summary>🚀 Rocket Mode</summary>
-        <p class="warn"><b>The riskiest thing Warrior does.</b> Small bets on pump.fun coins minutes old. Most end at or near zero, and some fall faster than any stop can sell. Treat each bet as money already spent.</p>
-        <details class="more"><summary>What the Rocket screen refuses</summary><p class="muted">Every round, while auto-trading is running, Warrior looks at the newest launches and refuses any that show a known warning sign: not a real pump.fun launch, a creator who can print or freeze, a few wallets or the creator holding too much, snipers, insiders or bundled wallets holding too much, too few holders or traders, holders who have already left, a crowd made of bots, a pool too small to get out of, more selling than buying, a copy of a bigger coin, or a creator who launches coins by the dozen and abandons them. Passing that screen does not make a coin safe.</p><p class="muted">⭐ marks a creator with a record: at least three earlier coins, half or more of which graduated from the launch curve. That is a fact about the past. It is not trust, and a graduated coin can still be dumped.</p></details>
-        <label class="toggle"><input type="checkbox" id="rocket-ack" /> I understand that most Rocket bets end at or near zero and that a 1,000% gain is rare.</label>
-        <label class="switch-row"><input type="checkbox" class="switch" role="switch" id="rocket-on" disabled /> <b>Rocket Mode on</b></label>
-        <div id="rocket-fields" class="fields"></div>
-        <p id="rocket-summary"></p>
-        <p id="rocket-record" class="muted"></p>
-        <p id="rocket-status" class="muted" role="status"></p>
-        <h3>On the launch pad</h3>
-        <p id="rocket-list-status" class="muted" role="status">Open this to see the newest launches.</p>
-        <div id="rocket-list" class="rows"></div>
-      </details>
-      <p class="muted">A round runs every minute while this tab is open; Rocket Mode looks every 30 seconds. Stopping does not sell.</p>
-      <div id="auto-positions" class="cards"></div>
-      <h3>Activity</h3>
-      <ul id="auto-log" class="log" aria-live="polite"></ul>
-    </div>
-    <details>
-      <summary>Prefer to run it from a terminal on your PC?</summary>
-      <ol class="steps">
-        <li>In the Warrior folder run <code>npm run wallet</code>. It creates a separate bot wallet on your PC and prints its address.</li>
-        <li>Send that address SOL from Phantom. Start small.</li>
-        <li>Run <code>npm run bot</code> for paper mode or <code>npm run bot:live</code> for real trades. Stop with <kbd>Ctrl</kbd>+<kbd>C</kbd>.</li>
-        <li><code>npm run wallet -- --withdraw YOUR_PHANTOM_ADDRESS</code> sends the SOL back.</li>
-      </ol>
-      <p class="muted">The terminal bot is steadier for long runs because it does not depend on a browser tab.</p>
-    </details>
+  <section class="card positions" aria-labelledby="pos-h">
+    <h2 id="pos-h" class="label">POSITIONS</h2>
+    <table class="book"><thead><tr><th>COIN</th><th>IN</th><th>NOW</th><th>P/L</th><th></th></tr></thead><tbody id="positions"></tbody></table>
+    <button id="out" class="btn ghost" type="button">Get me out: sell everything</button>
   </section>
 
-  <section class="panel" aria-labelledby="list-title">
-    <div class="panel-head"><h2 id="list-title">Watchlist and orders</h2><button id="alerts-toggle" class="btn" type="button" aria-pressed="false">🔕 Alerts off</button></div>
-    <p id="alerts-note" class="muted"></p>
-    <p id="engine-note" class="muted"></p>
-    <h3>Watching</h3>
-    <div id="watch-list" class="rows"></div>
-    <h3>My orders and slices</h3>
-    <div id="order-list" class="rows"></div>
+  <!-- bottom: wallet and the live log -->
+  <section class="card wallet" aria-labelledby="w-h">
+    <h2 id="w-h" class="label">TRADING WALLET</h2>
+    <div id="w-body"></div>
   </section>
 
-  <section class="panel" data-fold="phone" aria-labelledby="dial-title">
-    <div class="panel-head"><h2 id="dial-title">Strategy dial</h2></div>
-    <div id="dial-presets" class="presets"></div>
-    <details class="more"><summary>What these rules do</summary><p id="dial-text"></p><p id="dial-version" class="muted"></p></details>
-    <p id="dial-status" class="muted" role="status"></p>
-    <details>
-      <summary>Preset numbers</summary>
-      <p class="muted">When you switch presets, new trades and open positions follow the new numbers at once. A stop or target you set yourself on a position is left alone. Cost limits and the safety screen always apply.</p>
-      <div id="dial-fields" class="fields"></div>
-      <button id="dial-reset" class="btn" type="button" hidden>Back to the plain preset</button>
-    </details>
-    <details>
-      <summary>Bedtime rules</summary>
-      <p class="muted">Decide while you are wide awake when Warrior should stop. It applies to everything Warrior does by itself in this tab: auto-trading, orders, slices and copied buys. If you tap a buy yourself after bedtime, Warrior asks once and then does what you say.</p>
-      <label class="toggle"><input type="checkbox" id="bed-on" /> Use a bedtime rule</label>
-      <div class="fields">
-        <div class="fieldwrap"><label for="bed-stop">Stop opening trades at</label><input id="bed-stop" type="time" /></div>
-        <div class="fieldwrap"><label for="bed-close">Close everything by</label><input id="bed-close" type="time" /></div>
-        <div class="fieldwrap"><label for="bed-wake">Start again at</label><input id="bed-wake" type="time" /></div>
-      </div>
-      <label class="toggle"><input type="checkbox" id="bed-keep" /> Do not close anything: keep open positions overnight</label>
-      <p id="bed-text"></p>
-      <p id="bed-status" class="muted" role="status"></p>
-    </details>
-    <details>
-      <summary>How trades are sent</summary>
-      <div class="fields">
-        <div class="fieldwrap"><label for="send-priority">Priority fee (to land faster when the network is busy)</label><select id="send-priority"></select></div>
-      </div>
-      <label class="toggle"><input type="checkbox" id="send-protect" /> Protected sending: send straight to block builders (Jito) so bots watching the public queue cannot jump ahead of the trade</label>
-      <p class="muted">These apply to the trading wallet in this browser. Trades you approve in Phantom are sent by Phantom, with its own settings. Protected sending is new here and has not been used with real funds yet.</p>
-    </details>
-  </section>
-
-  <section class="panel" data-fold="phone" aria-labelledby="pf-title">
-    <div class="panel-head"><h2 id="pf-title">Portfolio and results</h2><div class="controls"><button id="pf-refresh" class="btn" type="button">Refresh prices</button><button id="pf-download" class="btn" type="button" disabled>Download history (CSV)</button></div></div>
-    <p id="pf-prices" class="muted" role="status"></p>
-    <div id="pf-body"></div>
-    <h3>Trade history</h3>
-    <div id="pf-history"></div>
-  </section>
-
-  <section class="panel" data-fold aria-labelledby="follow-title">
-    <div class="panel-head"><h2 id="follow-title">Follow a wallet</h2></div>
-    <p class="muted">See what a wallet buys, with Warrior's verdict on each. Copying is off unless you switch it on.</p>
-    <div class="row lookup">
-      <label class="sr-only" for="follow-wallet">Wallet address to follow</label>
-      <input id="follow-wallet" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="44" placeholder="Public wallet address" />
-      <label class="sr-only" for="follow-name">A name for it</label>
-      <input id="follow-name" type="text" maxlength="20" placeholder="Name it (optional)" />
-      <button id="follow-add" class="btn neon" type="button">Follow</button>
-    </div>
-    <p id="follow-status" class="muted" role="status"></p>
-    <div id="follow-list" class="cards"></div>
-  </section>
-
-  <section class="panel" data-fold aria-labelledby="score-title">
-    <div class="panel-head"><h2 id="score-title">Public scorecard</h2></div>
-    <details class="more"><summary>How the scorecard is kept</summary><p>A recorder looks at the market on a schedule, writes down every ENTER call under the Balanced rules, and later marks what the price did: reached the target, hit the stop, or ran out of time. Nobody edits it by hand, and losers stay on it. It measures the call before trading costs. It is not anyone's profit, and it promises nothing about the next call.</p></details>
-    <p id="score-status" class="muted" role="status">Loading the scorecard…</p>
-    <div id="score-body"></div>
-  </section>
-
-  <section class="panel" data-fold aria-labelledby="league-title">
-    <div class="panel-head"><h2 id="league-title">Practice league</h2></div>
-    <p class="muted">Compare practice results with friends. Pretend money only, on purpose.</p>
-    <p id="league-week" class="muted"></p>
-    <div class="fields">
-      <div class="fieldwrap"><label for="league-name">Your name in the league</label><input id="league-name" type="text" maxlength="16" placeholder="You" /></div>
-      <div class="fieldwrap"><label for="league-code">Your code this week (send it to friends)</label><input id="league-code" type="text" readonly /></div>
-    </div>
-    <div class="row"><button id="league-copy" class="btn" type="button">Copy my code</button></div>
-    <div class="row lookup">
-      <label class="sr-only" for="league-friend">A friend's league code</label>
-      <input id="league-friend" type="text" autocomplete="off" spellcheck="false" maxlength="240" placeholder="Paste a friend's code" />
-      <button id="league-add" class="btn neon" type="button">Add friend</button>
-    </div>
-    <p id="league-status" class="muted" role="status"></p>
-    <div id="league-table"></div>
-  </section>
-
-  <section class="panel" data-fold aria-labelledby="comfort-title">
-    <div class="panel-head"><h2 id="comfort-title">How did that feel?</h2></div>
-    <p id="comfort-ask" class="coach" hidden><b>You just finished a practice trade.</b> How comfortable did it feel? One tap is enough.</p>
-    <div id="comfort-scale" class="row scale" role="group" aria-label="How comfortable did using Warrior feel, from 1 to 5"></div>
-    <div class="fieldwrap"><label for="comfort-why">Was there a moment you hesitated or felt lost? (optional)</label><textarea id="comfort-why" rows="2" maxlength="500"></textarea></div>
-    <div class="row"><button id="comfort-save" class="btn neon" type="button">Save my answer</button><button id="comfort-copy" class="btn" type="button" disabled>Copy my answers</button></div>
-    <p id="comfort-facts" class="muted"></p>
-    <p id="comfort-status" class="muted" role="status"></p>
-    <p class="muted">Answers stay on this device. Nothing is sent unless you copy them and send them yourself.</p>
-  </section>
-
-  <section class="panel" data-fold aria-labelledby="install-title">
-    <div class="panel-head"><h2 id="install-title">Install Warrior like an app</h2><button id="install-btn" class="btn neon" type="button" hidden>Install Warrior</button></div>
-    <p id="install-note" class="muted"></p>
-    <p class="muted">Installed or not, Warrior only trades, checks orders and sends alerts while it is open. It cannot wake itself up after you close it.</p>
-  </section>
-
-  <section class="panel" data-fold aria-labelledby="rules-title">
-    <div class="panel-head"><h2 id="rules-title">The rules Warrior follows</h2></div>
-    <div class="rules">
-      <div><h3>Four signal groups</h3><p><b>Trend:</b> price above the 20 and 50 averages. <b>Momentum:</b> RSI between 50 and 78 with MACD rising. <b>Volume:</b> a surge above average with price over VWAP. <b>Structure:</b> a breakout, or a bounce off the trend line. Three of four must agree, unless you turn the strategy dial.</p></div>
-      <div><h3>Regime and bias</h3><p>No entries in a downtrend, in wild chaos, when the hourly bias is bearish, or when a coin is already overbought.</p></div>
-      <div><h3>Risk screen</h3><p>At least $40k of liquidity, $100k of daily volume and an hour of pool age (two hours on Chill). No coin that trades on pump.fun's exchange without having been launched on pump.fun, because that pool's money can be withdrawn by whoever put it there. No coins the creator can freeze or mint more of. Coins on the newer token type are traded only when their extras are harmless: none with a transfer fee, code that runs on transfers, a creator who can take or pause coins, or anything Warrior does not recognise.</p></div>
-      <div><h3>Young coins</h3><p>A coin with one to five hours of trading is read on one-minute candles instead of five-minute ones. Same four signal groups, the widest stop your rules allow, and half the usual size. Chill leaves young coins alone. Coins under an hour old are never traded: there is not enough to read.</p></div>
-      <div><h3>Rocket Mode</h3><p>Off unless you switch it on. Small bets on pump.fun coins one to sixty minutes old that pass a strict screen, sold at the stop, the target, or a trailing stop once the bet has doubled. Most Rocket bets lose.</p></div>
-      <div><h3>Costs</h3><p>pump.fun pools charge about 1% each way, so a round trip costs roughly 2% before the price moves at all. Warrior refuses a buy that would cost more than 3% to enter or lose more than 6% on an immediate round trip.</p></div>
-      <div><h3>Position rules</h3><p>On the Balanced setting: risk 2% of the wallet per trade, at most 25% in one coin, three positions at once. Stop loss sized from volatility, 10% target, a trailing stop once the trade is up by its own stop distance, a six-hour time limit, and no new trades after losing 10% in a day. Each of those exits can be changed or switched off under Exact numbers. Chill and Spicy change these numbers; the strategy dial shows exactly how.</p></div>
-    </div>
+  <section class="card log" aria-labelledby="log-h">
+    <h2 id="log-h" class="label">LIVE FEED · WHAT EACH AGENT DID</h2>
+    <ol id="log" class="term" aria-live="polite"></ol>
   </section>
 </main>
 
-<dialog id="trade" aria-labelledby="trade-title">
-  <form method="dialog">
-    <h2 id="trade-title">Trade</h2>
-    <div id="trade-body"></div>
-    <p id="trade-status" class="muted" role="status"></p>
-    <div class="dialog-actions">
-      <button id="trade-close" type="button" class="btn">Close</button>
-      <button id="trade-go" type="button" class="btn neon" disabled>Approve in wallet</button>
-    </div>
-  </form>
-</dialog>
+<footer class="strip">
+  <canvas id="bars" class="bars" aria-label="Trading volume of the watched coins" role="img"></canvas>
+  <p class="foot small">Warrior predicts nothing and promises nothing. Meme coins can fall to zero in minutes. Practice first; only trade money you can lose. <a href="/risk.html">Risks</a></p>
+</footer>
 
-<dialog id="coin" aria-labelledby="coin-title">
-  <h2 id="coin-title">Coin tools</h2>
-  <div id="coin-body" class="coin-body"></div>
-  <div class="dialog-actions"><button id="coin-close" type="button" class="btn">Close</button></div>
-</dialog>
+<dialog id="dlg"><form method="dialog" class="dlg"><h3 id="dlg-title"></h3><div id="dlg-body"></div><p id="dlg-status" class="small" role="status"></p><div class="row"><button id="dlg-go" class="btn" value="go" type="button"></button><button class="btn ghost" value="cancel">Close</button></div></form></dialog>
 
-<dialog id="extra" aria-labelledby="extra-title">
-  <h2 id="extra-title">Warrior</h2>
-  <div id="extra-body" class="coin-body"></div>
-  <div class="dialog-actions"><button id="extra-close" type="button" class="btn">Close</button></div>
-</dialog>
-
-<dialog id="mood" aria-labelledby="mood-title" aria-describedby="mood-text">
-  <div class="welcome-face" aria-hidden="true">🫖</div>
-  <h2 id="mood-title">A quick word first</h2>
-  <p id="mood-text"></p>
-  <div class="dialog-actions mood-actions">
-    <button id="mood-rest" type="button" class="btn">Take a breather</button>
-    <button id="mood-go" type="button" class="btn">Go ahead</button>
-  </div>
-</dialog>
-
-<dialog id="vault" aria-labelledby="vault-title">
-  <h2 id="vault-title">Trading wallet</h2>
-  <div id="vault-body" class="coin-body"></div>
-  <p id="vault-status" class="muted" role="status"></p>
-  <div class="dialog-actions"><button id="vault-close" type="button" class="btn">Cancel</button><button id="vault-go" type="button" class="btn neon">Continue</button></div>
-</dialog>
-
-<dialog id="welcome" aria-labelledby="welcome-title">
-  <div class="welcome-step" data-step="0">
-    <div class="welcome-face" aria-hidden="true">😄</div>
-    <h2 id="welcome-title">Hi, I'm Warrior.</h2>
-    <p>I watch Solana meme coins all day. I tell you, in plain words, when one looks worth a trade, and I tell you when to wait. Mostly I say wait.</p>
-  </div>
-  <div class="welcome-step" data-step="1" hidden>
-    <div class="welcome-face" aria-hidden="true">🧸</div>
-    <h2>Practice first. Always.</h2>
-    <p>You start with a pretend 0.5 SOL. Real prices, real quotes, no real money. You do not need a wallet, and nothing can be lost.</p>
-  </div>
-  <div class="welcome-step" data-step="2" hidden>
-    <div class="welcome-face" aria-hidden="true">🤝</div>
-    <h2>You are always in charge.</h2>
-    <p>One <b>Get me out</b> button sells everything. Tap any word you do not know and I will explain it. I never promise a profit: meme coins can fall to nothing. <a href="/risk">The risks, said straight.</a></p>
-  </div>
-  <div class="dialog-actions">
-    <button id="welcome-skip" type="button" class="btn">Just look around</button>
-    <button id="welcome-next" type="button" class="btn neon">Next</button>
-  </div>
-  <p class="muted welcome-dots" aria-hidden="true"><span class="on">●</span><span>●</span><span>●</span></p>
-</dialog>
-
-<div id="comfort" class="comfort" role="region" aria-label="What is at risk right now">
-  <span><span id="comfort-term"></span>: <b id="comfort-text">nothing right now.</b></span>
-  <button id="get-me-out" class="btn sell" type="button" disabled>Get me out</button>
-</div>
-
-<footer><span>😂 Warrior</span><span>Not financial advice. No profit is promised. You approve and own every trade.</span><nav class="legal-nav" aria-label="The small print, in plain words"><a href="/risk">The risks</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></nav></footer>
-<script type="module" src="/app.js"></script>
-<script type="module" src="/auto.js"></script>
-<script type="module" src="/tools.js"></script>
-<script type="module" src="/rocket.js"></script>
-<script type="module" src="/extras.js"></script>
-<script type="module" src="/trust.js"></script>
-<script type="module" src="/fold.js"></script>
-<script type="module" src="/dialogs.js"></script>
-<script type="module" src="/modals.js"></script>
+<script type="module" src="/js/main.js"></script>
 </body>
 </html>
