@@ -2,12 +2,13 @@
 // the shield passed it, the spear saw the tested setup and the commander had room and budget. Positions are watched every
 // 30 seconds. The rules come from the chosen strength (Chill, Balanced, Spicy), tested on real Solana prices.
 import { resolveRules, toQuery } from '/vendor/lib/presets.js';
-import { state, save, api, emit, on, lock } from './store.js';
+import { state, save, api, emit, on, lock, dials } from './store.js';
 import { claimTrading, releaseTrading, holdWhile } from './sync.js';
 import { buy, watch, balance, heldSol, live } from './trader.js';
 import { vault } from './wallet.js';
 import { fire } from './net.js';
 import { shadowRound } from './shadow.js';
+import { weatherFactor, weather } from './watch.js';
 
 export const AGENTS = [
   { id: 'inhloli', name: 'Inhloli', glyph: '👁', role: 'scout', job: 'Watches Solana meme and ecosystem coins; keeps only the busy ones.' },
@@ -17,7 +18,7 @@ export const AGENTS = [
   { id: 'induna', name: 'Induna', glyph: '👑', role: 'commander', job: 'Sizes every trade, caps how many are open, stops for the day after a loss limit, banks profit in steps.' },
   { id: 'umlobi', name: 'Umlobi', glyph: '✎', role: 'scribe', job: 'Writes down every decision and every result, costs included.' }
 ];
-export const rules = () => resolveRules({ preset: state.preset });
+export const rules = () => resolveRules({ preset: state.preset, adapt: dials() });
 const heard = {};
 let running = false, timer = 0, watcher = 0, last = null, nextAt = 0, rounds = 0, ms = 0;
 export const impi = { get running() { return running; }, get lastScan() { return last; }, get nextAt() { return nextAt; }, get rounds() { return rounds; }, get scanMs() { return ms; } };
@@ -32,7 +33,7 @@ async function round() {
   try {
     const R = rules(), open = state.positions.filter((p) => p.mode === state.mode);
     // 1. the scout
-    const t0 = performance.now(), scan = await api(`/api/scan?${toQuery({ preset: state.preset })}`); ms = performance.now() - t0; last = scan; emit('scan', scan);
+    const t0 = performance.now(), scan = await api(`/api/scan?${toQuery({ preset: state.preset, adapt: dials() })}`); ms = performance.now() - t0; last = scan; emit('scan', scan);
     const read = scan.results ?? [], quiet = read.filter((t) => t.analysis?.quiet).length;
     say('inhloli', `${scan.universe} coins watched; ${read.length} read closely${quiet ? `, ${quiet} too quiet to trade` : ''}.`);
     // 2. the shield
@@ -41,6 +42,8 @@ async function round() {
     const birds = read.filter((t) => (t.smart?.count ?? 0) > 0);
     if (birds.length) say('izinyoni', `Smart wallets buying: ${birds.map((t) => `${t.symbol} (${t.smart.count})`).join(', ')}.`);
     // 4. the spear
+    // dip weather: every coin that meets the deep-dip reading this round, whether or not it is bought
+    for (const t of read) { const a = t.analysis; if (Number.isFinite(a?.stretchPct) && a.stretchPct <= -R.settings.dipBelowPct && Number.isFinite(a.rsi) && a.rsi <= R.settings.dipRsi && Number.isFinite(t.priceUsd ?? a.price)) emit('dip-seen', { mint: t.mint, symbol: t.symbol, price: t.priceUsd ?? a.price }); }
     const owned = new Set(open.map((p) => p.mint));
     for (const t of read.filter((x) => x.analysis?.decision === 'enter' && !owned.has(x.mint) && (state.cooldown[x.mint] ?? 0) > Date.now())) {
       if ((heard[t.mint] ?? 0) > Date.now()) continue; heard[t.mint] = Date.now() + 15 * 60_000;
@@ -57,7 +60,8 @@ async function round() {
     const down = start > 0 ? (start - equity) / start * 100 : 0;
     if (down >= R.risk.dailyLossLimitPct) say('induna', `Down ${down.toFixed(1)}% today: the ${R.risk.dailyLossLimitPct}% limit is reached. No new trades until tomorrow.`, 'down');
     else if (open.length >= R.risk.maxOpenPositions) say('induna', `Holding ${open.length}, the most ${state.preset} allows.`);
-    else for (const t of picks) { if (state.positions.filter((p) => p.mode === state.mode).length >= R.risk.maxOpenPositions || !running) break; try { await buy(t, R); } catch (e) { say('induna', `${t.symbol}: buy failed (${e.message}). Nothing spent.`, 'down'); } }
+    else if (picks.length && weatherFactor() === 0) { const w = weather(); say('induna', `Severe storm: only ${w.up} of ${w.n} deep dips bounced in the last 6 hours. The weather guard holds new buys.`, 'down'); emit('indaba-line', { who: 'induna', text: `SEVERE STORM. ${w.up} of ${w.n} deep dips bounced in 6 hours. The weather guard holds new buys.`, tone: 'wait', chip: 'WAIT', verdict: true }); }
+    else for (const t of picks) { if (weatherFactor() < 1) t.analysis = { ...t.analysis, sizeFactor: (t.analysis.sizeFactor ?? 1) * weatherFactor() }; if (state.positions.filter((p) => p.mode === state.mode).length >= R.risk.maxOpenPositions || !running) break; try { await buy(t, R); } catch (e) { say('induna', `${t.symbol}: buy failed (${e.message}). Nothing spent.`, 'down'); } }
     // 6. the scribe
     const eq = (await balance()) + heldSol(); state.equity.push({ t: Date.now(), v: eq, mode: state.mode }); save(); emit('equity');
     say('umlobi', `Equity ${eq.toFixed(4)} SOL${live() ? '' : ' (practice)'}.`);
@@ -74,6 +78,7 @@ function roundTalk(scan, read, R) {
   line('inhloli', `${scan.universe} coins on the lists. ${read.length} read closely: the busiest and the ones dropping.`);
   line('isihlangu', `${scan.rejected} refused at the screen (pool size, trading, age, locked pool money). ${scan.passedScreen} passed.`, 'yes', 'SCREEN');
   for (const t of near) { const a = t.analysis, deep = Math.abs(a.stretchPct) >= s.dipBelowPct, low = Number.isFinite(a.rsi) && a.rsi <= s.dipRsi;
+    emit('missed', { mint: t.mint, symbol: t.symbol, price: t.priceUsd ?? a.price, rule: deep && low ? 'collapse' : !deep ? 'depth' : 'rsi', gap: s.dipBelowPct - Math.abs(a.stretchPct) });
     line('umkhonto', `Closest: ${t.symbol}, ${Math.abs(a.stretchPct).toFixed(1)}% under its average (needs ${s.dipBelowPct}%), RSI ${Number.isFinite(a.rsi) ? a.rsi.toFixed(0) : '?'} (needs ${s.dipRsi} or lower). ${deep && low ? (a.reasons?.[0] ?? 'Another rule says no') + '.' : `Not ${!deep && !low ? 'deep or oversold' : !deep ? 'deep' : 'oversold'} enough yet.`}`, 'wait', 'MISS'); }
   if (!near.length) line('umkhonto', 'No coin read closely is under its average right now.', 'wait', 'MISS');
   emit('indaba-line', { who: 'induna', text: 'NOTHING TO STRIKE. Waiting is a position too. Next round in a minute.', tone: 'wait', chip: 'WAIT', verdict: true, count: false });
@@ -97,4 +102,4 @@ on('trade', ({ side } = {}) => {
 });
 export function stop() { running = false; nextAt = 0; clearInterval(timer); clearInterval(watcher); void releaseTrading(); say('induna', 'The impi is resting. Open positions are still yours; start again to keep watching them.'); emit('running'); }
 /** A look without trading, so the dashboard is alive before the impi is sent. */
-export async function peek() { try { const t0 = performance.now(), scan = await api(`/api/scan?${toQuery({ preset: state.preset })}`); ms = performance.now() - t0; last = scan; emit('scan', scan); } catch { /* shown next time */ } }
+export async function peek() { try { const t0 = performance.now(), scan = await api(`/api/scan?${toQuery({ preset: state.preset, adapt: dials() })}`); ms = performance.now() - t0; last = scan; emit('scan', scan); } catch { /* shown next time */ } }

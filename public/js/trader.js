@@ -5,8 +5,8 @@ import { VersionedTransaction, Transaction, TransactionInstruction, PublicKey } 
 import { unexpectedPrograms, closableAccounts, CLOSE_ACCOUNT_DATA } from '/vendor/lib/vault.js';
 import { positionSize } from '/vendor/lib/risk.js';
 import { partialDue, autoExitDue, ownExitDue, confirm, poolEmptied } from '/vendor/lib/orders.js';
-import { state, save, api, post, SOL, emit } from './store.js';
-import { resolveRules } from '/vendor/lib/presets.js';
+import { state, save, api, post, SOL, emit, dials } from './store.js';
+import { resolveRules, toQuery } from '/vendor/lib/presets.js';
 import { DIP_REPEAT_HOURS } from '/vendor/lib/strategy.js';
 import { vault, waitFor, liveBalance } from './wallet.js';
 
@@ -49,10 +49,11 @@ export async function buy(t, rules) {
   if (!size.sol) { say('induna', `${t.symbol}: no room. ${size.reasons.join('; ')}.`); talk('induna', `NOT NOW. ${size.reasons.join('; ')}.`, 'wait', 'WAIT', true); return false; }
   talk('induna', `${mine().length} of ${r.maxOpenPositions} slots in use. Size ${size.sol.toFixed(3)} SOL: a ${(a.stopPct ?? 10).toFixed(0)}% stop risks about ${(size.sol * (a.stopPct ?? 10) / equity).toFixed(1)}% of the wallet.`, 'yes', 'ROOM');
   const safety = await api(`/api/coin?what=mint&mint=${t.mint}`);
-  if (!safety.safe) { talk('isihlangu', `${safety.reason}.`, 'no', 'FAIL'); talk('induna', 'REFUSED. Not again for 6 hours.', 'no', 'NO', true); say('isihlangu', `${t.symbol} refused: ${safety.reason}.`, 'down'); state.cooldown[t.mint] = Date.now() + 6 * 3_600_000; return false; }
+  const missed = (rule) => emit('missed', { mint: t.mint, symbol: t.symbol, price: t.priceUsd ?? a.price, rule });
+  if (!safety.safe) { missed('token'); talk('isihlangu', `${safety.reason}.`, 'no', 'FAIL'); talk('induna', 'REFUSED. Not again for 6 hours.', 'no', 'NO', true); say('isihlangu', `${t.symbol} refused: ${safety.reason}.`, 'down'); state.cooldown[t.mint] = Date.now() + 6 * 3_600_000; return false; }
   talk('isihlangu', 'No freeze or mint power on the token.', 'yes', 'PASS');
   let launch; try { launch = await api(`/api/coin?what=audit&mint=${t.mint}&level=${state.preset}`); } catch { talk('isihlangu', 'Its launch record could not be read. Unknown is not safe.', 'no', 'FAIL'); talk('induna', 'NOT NOW. Trying again next round.', 'wait', 'WAIT', true); say('isihlangu', `${t.symbol}: its launch record could not be read, so no buy. Unknown is not safe.`); return false; }
-  if (!launch.ok) { talk('isihlangu', `${launch.reasons.join('. ')}.`, 'no', 'FAIL'); talk('induna', 'REFUSED. Not again for 24 hours.', 'no', 'NO', true); say('isihlangu', `${t.symbol} refused: ${launch.reasons.join('. ')}.`, 'down'); state.cooldown[t.mint] = Date.now() + 24 * 3_600_000; return false; }
+  if (!launch.ok) { missed('launch'); talk('isihlangu', `${launch.reasons.join('. ')}.`, 'no', 'FAIL'); talk('induna', 'REFUSED. Not again for 24 hours.', 'no', 'NO', true); say('isihlangu', `${t.symbol} refused: ${launch.reasons.join('. ')}.`, 'down'); state.cooldown[t.mint] = Date.now() + 24 * 3_600_000; return false; }
   const lamports = Math.round(size.sol * 1e9); let q, got, spent = size.sol, sig = 'practice', costPct = null;
   // If the buy fails on-chain (the price moved past the slippage limit), nothing was bought: it is tried once more at a fresh price.
   for (let attempt = 1; ; attempt++) {
@@ -61,7 +62,7 @@ export async function buy(t, rules) {
     if (attempt === 1) talk('isihlangu', 'Launch record clean: no bundled buys or staged launch.', 'yes', 'PASS');
     const back = await api(`/api/quote?${new URLSearchParams({ inputMint: t.mint, outputMint: SOL, amount: q.quote.outAmount, exit: '1' })}`), loss = (1 - Number(back.quote.outAmount) / lamports) * 100;
     // Selling straight back must cost 3% or less. Most watched coins cost under 1%; a coin costing more has to rise a long way just to break even.
-    if (!(loss <= 3)) { talk('isihlangu', `Selling straight back would cost ${loss.toFixed(2)}%. The limit is 3%.`, 'no', 'FAIL'); talk('induna', `REFUSED. It would have to rise about ${loss.toFixed(0)}% just to break even. Not again for an hour.`, 'no', 'NO', true); say('isihlangu', `${t.symbol} refused: selling straight back would cost ${loss.toFixed(1)}% (the limit is 3%).`, 'down'); state.cooldown[t.mint] = Date.now() + 3_600_000; return false; }
+    if (!(loss <= 3)) { missed('cost'); talk('isihlangu', `Selling straight back would cost ${loss.toFixed(2)}%. The limit is 3%.`, 'no', 'FAIL'); talk('induna', `REFUSED. It would have to rise about ${loss.toFixed(0)}% just to break even. Not again for an hour.`, 'no', 'NO', true); say('isihlangu', `${t.symbol} refused: selling straight back would cost ${loss.toFixed(1)}% (the limit is 3%).`, 'down'); state.cooldown[t.mint] = Date.now() + 3_600_000; return false; }
     costPct = Math.max(0, loss); if (attempt === 1) talk('isihlangu', `Selling straight back would cost ${costPct.toFixed(2)}%. The limit is 3%.`, 'yes', 'PASS');
     got = q.quote.outAmount;
     if (!live()) { state.paperSol -= size.sol; break; }
@@ -74,7 +75,7 @@ export async function buy(t, rules) {
   }
   const price = Number(q.quote.swapUsdValue) / (Number(got) / 10 ** safety.decimals), entry = Number.isFinite(price) && price > 0 ? price : a.price;
   const stop = entry * (1 - (a.stopPct ?? 10) / 100);
-  state.positions.push({ mode: state.mode, mint: t.mint, symbol: t.symbol, pool: t.pool, solIn: spent, tokenRaw: got, entry, stop, baseStop: stop, target: entry * (1 + rules.settings.targetPct / 100), entryBar: a.at ?? Date.now(), openedAt: Date.now(), peak: entry, tf: a.tf === 1 ? 1 : 5, ...(a.style === 'dip' ? { dip: 1 } : {}), style: a.style ?? 'trend', auto: {}, sig, rules: rules.version, costPct });
+  state.positions.push({ mode: state.mode, mint: t.mint, symbol: t.symbol, pool: t.pool, solIn: spent, tokenRaw: got, entry, stop, baseStop: stop, target: entry * (1 + rules.settings.targetPct / 100), entryBar: a.at ?? Date.now(), openedAt: Date.now(), peak: entry, tf: a.tf === 1 ? 1 : 5, ...(a.style === 'dip' ? { dip: 1 } : {}), style: a.style ?? 'trend', auto: {}, sig, rules: rules.version, costPct, depth: Number.isFinite(a.stretchPct) ? a.stretchPct : null });
   save(); emit('trade', { side: 'buy', symbol: t.symbol, sol: spent });
   talk('induna', `BUY ${spent.toFixed(4)} SOL${live() ? '' : ' (practice)'}. ${rules.settings.stepPct ? `A third at +${rules.settings.stepPct}%, a third at +${rules.settings.stepPct * 2}%, the rest at +${rules.settings.targetPct}%` : `Sell at +${rules.settings.targetPct}%`}, stop −${(a.stopPct ?? 10).toFixed(0)}%, out after ${rules.settings.holdHours} hours.`, 'yes', 'BUY', true);
   talk('umlobi', `Written down: entry $${entry.toPrecision(4)}, round-trip cost ${costPct.toFixed(2)}%, rules ${rules.version}.`);
@@ -96,10 +97,10 @@ export async function sell(p, reason, fraction = 1) {
     if (whole) { rent = await reclaim(p.mint); out += rent; } }
   else state.paperSol += out;
   const cost = whole ? p.solIn : p.solIn * fraction, pnl = out - cost;
-  state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, solIn: cost, solOut: out, pnlSol: pnl, pnlPct: pnl / cost * 100, reason, style: p.style, partial: !whole, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules, costPct: p.costPct ?? null });
-  if (whole) { state.positions = state.positions.filter((x) => x !== p); const R = resolveRules({ preset: state.preset }).risk; state.cooldown[p.mint] = Math.max(Date.now() + (pnl < 0 ? R.lossCooldownMinutes : R.cooldownMinutes) * 60_000, p.dip === 1 ? p.openedAt + DIP_REPEAT_HOURS * 3_600_000 : 0); } // the same waits as Laugh
+  state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, solIn: cost, solOut: out, pnlSol: pnl, pnlPct: pnl / cost * 100, reason, style: p.style, partial: !whole, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules, costPct: p.costPct ?? null, preset: String(p.rules ?? state.preset).split(/[-+~]/)[0], peakPct: Number.isFinite(p.peak) && p.entry > 0 ? (p.peak / p.entry - 1) * 100 : null, depthPct: p.depth ?? null, px: p.last ?? null });
+  if (whole) { state.positions = state.positions.filter((x) => x !== p); const R = resolveRules({ preset: state.preset, adapt: dials() }).risk; state.cooldown[p.mint] = Math.max(Date.now() + (pnl < 0 ? R.lossCooldownMinutes : R.cooldownMinutes) * 60_000, p.dip === 1 ? p.openedAt + DIP_REPEAT_HOURS * 3_600_000 : 0); } // the same waits as Laugh
   else { p.solIn -= cost; p.tokenRaw = (held - raw).toString(); delete p.nowSol; } // the old value was for the whole position
-  save(); emit('trade', { side: 'sell', symbol: p.symbol, pnl });
+  save(); emit('trade', { side: 'sell', symbol: p.symbol, pnl, mint: p.mint, pool: p.pool, px: p.last ?? null, reason, whole });
   say('umlobi', `SELL ${p.symbol}${whole ? '' : ` (${Math.round(fraction * 100)}%)`}: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} SOL (${(pnl / cost * 100).toFixed(1)}%) · ${reason}${rent > 0 ? ` · ${rent.toFixed(4)} SOL of account rent back` : ''}.`, pnl >= 0 ? 'up' : 'down');
   return true;
 }
@@ -107,7 +108,7 @@ export async function sell(p, reason, fraction = 1) {
 /** Every 30 seconds: price each open position, take profit in steps, and follow the stop, target and clock. */
 export async function watch(rules) {
   const list = mine(); if (!list.length) return;
-  let res = []; try { res = (await post('/api/manage', { rules: { preset: state.preset }, positions: list.slice(0, 6).map((p) => ({ pool: p.pool, mint: p.mint, entry: p.entry, stop: p.stop, target: p.target, entryBar: p.entryBar, openedAt: p.openedAt, peak: p.peak, tf: p.tf, baseStop: p.baseStop, ...(p.dip === 1 ? { dip: 1 } : {}) })) })).results; } catch (e) { say('induna', `Positions could not be checked (${e.message}). Holding.`); return; }
+  let res = []; try { res = (await post('/api/manage', { rules: Object.fromEntries(new URLSearchParams(toQuery({ preset: state.preset, adapt: dials() }))), positions: list.slice(0, 6).map((p) => ({ pool: p.pool, mint: p.mint, entry: p.entry, stop: p.stop, target: p.target, entryBar: p.entryBar, openedAt: p.openedAt, peak: p.peak, tf: p.tf, baseStop: p.baseStop, ...(p.dip === 1 ? { dip: 1 } : {}) })) })).results; } catch (e) { say('induna', `Positions could not be checked (${e.message}). Holding.`); return; }
   for (const [i, m] of res.entries()) {
     const p = list[i]; if (!p || m.pool !== p.pool) continue;
     if (m.peak) p.peak = m.peak; if (m.stop) p.stop = Math.max(p.stop, m.stop); if (m.lastPrice) p.last = m.lastPrice;

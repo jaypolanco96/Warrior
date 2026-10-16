@@ -253,3 +253,28 @@ select{font:13px var(--sans);padding:6px 8px;border:1px solid var(--line);border
 @media (max-width:1100px){.desk{grid-template-areas:"core core" "agents pnl" "flow dist" "positions positions" "indaba indaba" "portfolio score" "wallet wallet" "log log"}}
 @media (max-width:700px){.desk{grid-template-areas:"core" "pnl" "positions" "indaba" "portfolio" "score" "agents" "wallet" "flow" "dist" "log"}}
 @media (min-width:1101px){.indaba{grid-area:auto}}
+
+/* self-ruling and the watchtower */
+.adapt{grid-area:adapt}.watchtower{grid-area:watchtower}
+@media (min-width:1101px){.adapt,.watchtower{grid-area:auto}}
+@media (max-width:1100px){.desk{grid-template-areas:"core core" "agents pnl" "flow dist" "positions positions" "indaba indaba" "adapt watchtower" "portfolio score" "wallet wallet" "log log"}}
+@media (max-width:700px){.desk{grid-template-areas:"core" "pnl" "positions" "indaba" "adapt" "watchtower" "portfolio" "score" "agents" "wallet" "flow" "dist" "log"}}
+.adapt .book tr.moved td{font-weight:800;background:#f3ecff}
+:root[data-theme=dark] .adapt .book tr.moved td{background:#2a1f44}
+.adapt .row,.watchtower .row{margin:6px 0 10px}
+.adapt select,.watchtower select{max-width:100%}
+.proposal{border:2px solid var(--r6);border-radius:8px;padding:10px;margin:10px 0}
+.proposal p{margin:4px 0 8px}
+.ahist{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:12px}
+.ahist li{display:grid;gap:2px;border-left:3px solid var(--r5);padding-left:8px}
+.ahist li.revert{border-left-color:var(--down)}.ahist li.keep{border-left-color:var(--up)}
+.weather{display:grid;gap:4px;padding:10px;border-radius:8px;border:1px solid var(--line)}
+.weather b{font:800 18px var(--serif)}
+.weather span{font-size:12px;color:var(--soft)}
+.weather.good b{color:var(--up)}.weather.mixed b{color:#b88600}.weather.storm b,.weather.severe b{color:var(--down)}
+.wbar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.wbar i{display:block;height:100%;background:var(--road)}
+.wbar i.w0{width:0%}.wbar i.w1{width:10%}.wbar i.w2{width:20%}.wbar i.w3{width:30%}.wbar i.w4{width:40%}.wbar i.w5{width:50%}.wbar i.w6{width:60%}.wbar i.w7{width:70%}.wbar i.w8{width:80%}.wbar i.w9{width:90%}.wbar i.w10{width:100%}
+.watchtower .book td:first-child{white-space:normal}
+.adapt .book td,.adapt .book th,.watchtower .book td,.watchtower .book th{white-space:normal;padding:4px 4px}
+.adapt .book{font-size:11px}

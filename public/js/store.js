@@ -17,6 +17,8 @@ export async function exclusive(fn) { if (lock.busy) throw new Error('Warrior is
 export function save() {
   try { localStorage.removeItem(OLD); localStorage.setItem(KEY, JSON.stringify({ ...state, trades: state.trades.slice(-500), equity: state.equity.slice(-2000), log: state.log.slice(-200) })); } catch { /* storage full or blocked: keep going in memory */ }
 }
+/** The self-ruling moves in force for a strength (see adapt.js); {} when none. */
+export const dials = (preset = state.preset) => state.adapt?.[preset]?.dials ?? {};
 export const SOL = 'So11111111111111111111111111111111111111112';
 export async function api(path, init) {
   const r = await fetch(path, init); let j = null; try { j = await r.json(); } catch { /* not JSON */ }
