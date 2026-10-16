@@ -2,13 +2,13 @@
 //  - Only four dials may move (lib/presets.mjs ADAPT), one step at a time, inside ranges replays have tested.
 //    Safety rules (pool size, cost limit, launch and token checks, the stop itself) are never loosened by this.
 //  - Every move needs enough evidence: a minimum number of trades and a clear, one-sided result.
-//  - At most one move a day per strength. A move is on probation for its next 8 trades: if they do worse than the 10
+//  - Checked after every sale. One move at a time: a move is on probation for its next 8 trades: if they do worse than the 10
 //    before it, it is undone and that dial is left alone for 3 days.
 //  - Modes: Auto (moves by itself), Suggest (proposes; you press Apply), Off.
 // Evidence comes from the trade history and the watchtower (watch.js). Everything is written to the history below.
 import { state, save, emit, on } from './store.js';
 import { ADAPT, resolveRules } from '/vendor/lib/presets.js';
-import { evidence as decide, judge as verdictOf, baselineOf, perDayOf } from '/vendor/lib/adapt.js';
+import { evidence as decide, judge as verdictOf, baselineOf, perDayOf, MIN_GAP_MS } from '/vendor/lib/adapt.js';
 import { afterByReason, missedByRule } from './watch.js';
 
 const H = 3_600_000, DAY = 24 * H, $ = (id) => document.getElementById(id);
@@ -63,7 +63,7 @@ function judge(preset) {
 export function think() {
   const preset = state.preset, b = book(preset); state.adapt.mode ??= 'auto';
   judge(preset);
-  if (state.adapt.mode === 'off' || b.probation || Date.now() - b.last < DAY) { draw(); return; }
+  if (state.adapt.mode === 'off' || b.probation || Date.now() - b.last < MIN_GAP_MS) { draw(); return; }
   const move = evidence(preset).find((m) => !((b.locked[m.key] ?? 0) > Date.now()));
   if (!move) { b.proposal = null; draw(); return; }
   if (state.adapt.mode === 'auto') apply(preset, move, 'auto');
