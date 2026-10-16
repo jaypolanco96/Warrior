@@ -6,6 +6,8 @@ import { unexpectedPrograms, closableAccounts, CLOSE_ACCOUNT_DATA } from '/vendo
 import { positionSize } from '/vendor/lib/risk.js';
 import { partialDue, autoExitDue, ownExitDue, confirm, poolEmptied } from '/vendor/lib/orders.js';
 import { state, save, api, post, SOL, emit } from './store.js';
+import { resolveRules } from '/vendor/lib/presets.js';
+import { DIP_REPEAT_HOURS } from '/vendor/lib/strategy.js';
 import { vault, waitFor, liveBalance } from './wallet.js';
 
 export const live = () => state.mode === 'live';
@@ -30,7 +32,7 @@ async function swap(quoteResponse, exit) {
 
 /**
  * Buy a coin the spear picked. The shield checks it twice more first: the token itself (freeze/mint authority) and its
- * launch record (bundled buys, staged launches). Then a round trip is priced: a coin that loses over 6% when sold straight
+ * launch record (bundled buys, staged launches). Then a round trip is priced: a coin that costs over 3% to sell straight
  * back is taxed or trapped. Returns true when coins were bought.
  */
 export async function buy(t, rules) {
@@ -82,7 +84,7 @@ export async function sell(p, reason, fraction = 1) {
   else state.paperSol += out;
   const cost = whole ? p.solIn : p.solIn * fraction, pnl = out - cost;
   state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, solIn: cost, solOut: out, pnlSol: pnl, pnlPct: pnl / cost * 100, reason, style: p.style, partial: !whole, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules, costPct: p.costPct ?? null });
-  if (whole) { state.positions = state.positions.filter((x) => x !== p); state.cooldown[p.mint] = Math.max(Date.now() + (pnl < 0 ? 120 : 30) * 60_000, p.dip === 1 ? p.openedAt + 6 * 3_600_000 : 0); }
+  if (whole) { state.positions = state.positions.filter((x) => x !== p); const R = resolveRules({ preset: state.preset }).risk; state.cooldown[p.mint] = Math.max(Date.now() + (pnl < 0 ? R.lossCooldownMinutes : R.cooldownMinutes) * 60_000, p.dip === 1 ? p.openedAt + DIP_REPEAT_HOURS * 3_600_000 : 0); } // the same waits as Laugh
   else { p.solIn -= cost; p.tokenRaw = (held - raw).toString(); delete p.nowSol; } // the old value was for the whole position
   save(); emit('trade', { side: 'sell', symbol: p.symbol, pnl });
   say('umlobi', `SELL ${p.symbol}${whole ? '' : ` (${Math.round(fraction * 100)}%)`}: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} SOL (${(pnl / cost * 100).toFixed(1)}%) · ${reason}${rent > 0 ? ` · ${rent.toFixed(4)} SOL of account rent back` : ''}.`, pnl >= 0 ? 'up' : 'down');

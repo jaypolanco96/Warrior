@@ -91,9 +91,9 @@ test('portfolio sums and a safe CSV', () => {
   assert.ok(lines[1].includes('practice,A,0.100000,0.120000,0.020000,20.00,target,balanced-abc123')); assert.ok(lines[2].includes('-0.010000'), 'negative numbers stay numbers');
   assert.ok(lines[3].includes('trading-wallet,C') && lines[3].includes(',sig123,'));
   // the columns that say what kind of trade it was and what Warrior saw when it bought
-  assert.ok(lines[0].endsWith('exit_transaction,kind,opened_at_utc,minutes_held,coin_age_min_at_buy,holders_at_buy,traders_at_buy,bundles_at_buy,coin_address'));
+  assert.ok(lines[0].endsWith('exit_transaction,kind,opened_at_utc,minutes_held,coin_age_min_at_buy,holders_at_buy,traders_at_buy,bundles_at_buy,coin_address,round_trip_cost_pct'));
   const rich = tradesCsv([{ mode: 'live', symbol: 'R', mint: 'MintAddr', solIn: 0.0267, solOut: 0.01, pnlSol: -0.0167, pnlPct: -62.5, reason: 'stop', openedAt: 60_000, closedAt: 240_000, kind: 'early', rocket: true, checked: { ageMin: 4, holders: 180, traders: 320, bundles: 6 } }]).trim().split('\r\n')[1];
-  assert.ok(rich.endsWith(',early,1970-01-01T00:01:00.000Z,3.0,4,180,320,6,MintAddr'), rich); assert.ok(tradesCsv([{ mode: 'paper', symbol: 'old', solIn: 1, solOut: 1, pnlSol: 0, pnlPct: 0, reason: 'manual', closedAt: 5 }]).trim().split('\r\n')[1].endsWith(',,,,,,,,'), 'an older trade without these facts leaves them blank'); assert.ok(lines[4].includes(`"'=HYPERLINK(""http://x"",""y"")"`), 'formula cells are neutralised');
+  assert.ok(rich.endsWith(',early,1970-01-01T00:01:00.000Z,3.0,4,180,320,6,MintAddr,'), rich); assert.ok(tradesCsv([{ mode: 'paper', symbol: 'old', solIn: 1, solOut: 1, pnlSol: 0, pnlPct: 0, reason: 'manual', closedAt: 5 }]).trim().split('\r\n')[1].endsWith(',,,,,,,,,'), 'an older trade without these facts leaves them blank'); assert.ok(lines[4].includes(`"'=HYPERLINK(""http://x"",""y"")"`), 'formula cells are neutralised');
 });
 
 test('following a wallet: only real buys count', () => {

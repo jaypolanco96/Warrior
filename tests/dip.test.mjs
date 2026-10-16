@@ -93,7 +93,7 @@ test('deep dips skip coins collapsing over the day, and a coin is dip-bought at 
   assert.equal(resolveRules({ preset: 'balanced' }).settings.dipDayDropPct, 10, 'presets skip coins down 10% in a day');
   const { validateSettings } = await import('../lib/strategy.mjs'); assert.throws(() => validateSettings({ dipDayDropPct: 2 }));
   const src = (await import('node:fs')).readFileSync(new URL('../public/js/trader.js', import.meta.url), 'utf8');
-  assert.match(src, /p\.dip === 1 \? p\.openedAt \+ 6 \* 3_600_000/, 'the trader waits six hours from a dip buy before buying the same coin again');
+  assert.match(src, /p\.dip === 1 \? p\.openedAt \+ DIP_REPEAT_HOURS \* 3_600_000/, 'the trader waits six hours from a dip buy before buying the same coin again');
   const scan = (await import('node:fs')).readFileSync(new URL('../lib/scan.mjs', import.meta.url), 'utf8');
   assert.match(scan, /a collapse, not a dip/);
 });
