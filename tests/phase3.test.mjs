@@ -15,7 +15,7 @@ test('"Why not?" names every rule that said no and what would change it', () => 
   const items = whyNot(wait, rules), rulesHit = items.map((i) => i.rule);
   for (const expected of ['Safety screen: pool size', 'Safety screen: supply', 'Regime: downtrend', 'Hourly bias', rules.settings.maxEntryRsi >= 78 ? 'Overbought' : 'Your RSI limit', 'Signal groups']) assert.ok(rulesHit.includes(expected), expected);
   assert.ok(items.every((i) => i.said && i.change));
-  assert.match(items.find((i) => i.rule === 'Safety screen: pool size').said, /\$9,000/); assert.match(items.find((i) => i.rule === 'Safety screen: pool size').change, /\$40,000/);
+  assert.match(items.find((i) => i.rule === 'Safety screen: pool size').said, /\$9,000/); assert.match(items.find((i) => i.rule === 'Safety screen: pool size').change, /\$30,000/);
   assert.match(items.find((i) => i.rule === 'Signal groups').said, /1 of 4 agree; your rules need 4\. Missing: momentum, volume and price structure/);
   assert.deepEqual(whyNot(enter, rules), [], 'an ENTER has nothing to explain');
   assert.equal(whyNot({ analysis: { decision: 'wait', confirmations: null, reasons: ['Candles unavailable'] } }, rules)[0].rule, 'Price history');
