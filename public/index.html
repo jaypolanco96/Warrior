@@ -70,6 +70,12 @@
     <dl class="stats"><dt>TRADES</dt><dd id="s-trades">0</dd><dt>WIN RATE</dt><dd id="s-win">—</dd><dt>AVG / TRADE</dt><dd id="s-avg">—</dd><dt>OPEN</dt><dd id="s-open">0</dd></dl>
     <dl class="stats"><dt>BEST</dt><dd id="s-best">—</dd><dt>WORST</dt><dd id="s-worst">—</dd><dt>PROFIT FACTOR</dt><dd id="s-pf">—</dd><dt>AVG HOLD</dt><dd id="s-hold">—</dd></dl>
   </section>
+  <section class="card portfolio" aria-labelledby="pf-h">
+    <h2 id="pf-h" class="label">PORTFOLIO</h2>
+    <div id="portfolio"></div>
+    <h3 class="label sub">MY ORDERS</h3>
+    <ul id="orders" class="orders"></ul>
+  </section>
   <section class="card wallet" aria-labelledby="w-h">
     <h2 id="w-h" class="label">TRADING WALLET</h2>
     <div id="w-body"></div>
@@ -88,6 +94,8 @@
 </footer>
 
 <dialog id="dlg"><form method="dialog" class="dlg"><h3 id="dlg-title"></h3><div id="dlg-body"></div><p id="dlg-status" class="small" role="status"></p><div class="row"><button id="dlg-go" class="btn" value="go" type="button"></button><button class="btn ghost" value="cancel">Close</button></div></form></dialog>
+
+<dialog id="pos-dlg" class="pos-dlg" aria-labelledby="pos-title"><div class="dlg"><div class="row pos-head"><h3 id="pos-title"></h3><button id="pos-close" class="btn ghost" type="button">Close</button></div><div id="pos-body"></div></div></dialog>
 
 <script type="module" src="/js/main.js"></script>
 </body>

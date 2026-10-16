@@ -4,7 +4,7 @@
 import { VersionedTransaction, Transaction, TransactionInstruction, PublicKey } from '/vendor/solana.js';
 import { unexpectedPrograms, closableAccounts, CLOSE_ACCOUNT_DATA } from '/vendor/lib/vault.js';
 import { positionSize } from '/vendor/lib/risk.js';
-import { partialDue, autoExitDue, confirm, poolEmptied } from '/vendor/lib/orders.js';
+import { partialDue, autoExitDue, ownExitDue, confirm, poolEmptied } from '/vendor/lib/orders.js';
 import { state, save, api, post, SOL, emit } from './store.js';
 import { vault, waitFor, liveBalance } from './wallet.js';
 
@@ -117,16 +117,36 @@ async function reclaim(mint) {
 }
 /** Every 15 seconds: the stop and target against the live price, between candle checks. Two looks in a row must agree. */
 const seen = new Map();
-export async function liveStops() {
+export async function liveStops({ auto = true } = {}) {
   const list = mine(); if (!list.length) return;
   let j; try { j = await api(`/api/coin?what=prices&mints=${[...new Set(list.map((p) => p.mint))].join(',')}`); } catch { return; }
   for (const p of list) {
     const liq = j.liquidity?.[p.mint]; if (liq !== undefined) { const was = !!p.empty; p.empty = poolEmptied(liq); if (p.empty && !was) say('isihlangu', `${p.symbol}: its pool has been emptied, so it cannot be sold right now. Watching in case that changes.`, 'down'); }
     if (p.empty) continue;
     const price = j.prices?.[p.mint]; if (Number.isFinite(price)) p.last = price;
+    // your own stop and target work whether or not the impi is out
+    const own = ownExitDue(p, price); if (own) { await sell(p, `my ${own}`); continue; }
+    if (!auto) { seen.delete(`${p.mode}:${p.mint}`); continue; }
     const due = autoExitDue(p, price); if (!confirm(seen, `${p.mode}:${p.mint}`, due)) continue;
     seen.delete(`${p.mode}:${p.mint}`); await sell(p, due === 'stop' && p.stop >= p.entry ? 'trailing-stop' : due);
   }
   save();
+}
+/** Add funds to an open position: buy more of the same coin. The average price paid is worked out again from both buys. */
+export async function addFunds(p, sol, slippageBps) {
+  if (p.mode !== state.mode) throw new Error(`This position was opened in ${p.mode === 'live' ? 'live' : 'practice'} mode. Switch back to act on it`);
+  if (!(sol >= 0.01 && sol <= 5)) throw new Error('Add 0.01 to 5 SOL');
+  const bal = await balance(); if (sol > bal - (live() ? 0.01 : 0)) throw new Error(`Not enough SOL: ${bal.toFixed(4)} in the wallet${live() ? ', and about 0.01 is kept for fees' : ''}`);
+  const safety = await api(`/api/coin?what=mint&mint=${p.mint}`); if (!safety.safe) throw new Error(safety.reason);
+  const q = await api(`/api/quote?${new URLSearchParams({ inputMint: SOL, outputMint: p.mint, amount: String(Math.round(sol * 1e9)), slip: String(slippageBps) })}`);
+  if (!q.check.ok) throw new Error(q.check.reasons.join('; '));
+  let got = BigInt(q.quote.outAmount), spent = sol;
+  if (live()) { const before = await liveBalance(), had = await tokenRaw(p.mint), res = await swap(q.quote, false); if (res.outcome !== 'confirmed') throw new Error(`the buy ${res.outcome === 'failed' ? 'failed on-chain; nothing was bought' : 'outcome is unknown'}`); got = (await tokenRaw(p.mint)) - had; try { spent = Math.max(sol, before - await liveBalance()); } catch { /* keep the asked amount */ } }
+  else state.paperSol -= sol;
+  if (got <= 0n) throw new Error('no coins arrived');
+  const price = Number(q.quote.swapUsdValue) / (Number(got) / 10 ** safety.decimals), had = Number(p.tokenRaw), more = Number(got);
+  if (Number.isFinite(price) && price > 0 && had + more > 0) p.entry = (p.entry * had + price * more) / (had + more);
+  p.solIn += spent; p.tokenRaw = (BigInt(p.tokenRaw) + got).toString(); delete p.nowSol; save(); emit('trade', { side: 'buy', symbol: p.symbol, sol: spent });
+  say('umkhonto', `ADD ${p.symbol}: ${spent.toFixed(4)} SOL${live() ? '' : ' (practice)'} · now ${p.solIn.toFixed(4)} SOL in it.`, 'up'); return true;
 }
 export async function sellAll() { for (const p of [...mine()]) await sell(p, 'get-me-out'); }

@@ -1,5 +1,7 @@
 // The dashboard: draws the desk and wires every control. Trading logic lives in impi.js and trader.js.
-import { state, save, on, emit } from './store.js';
+import { state, save, on, emit, reload, exclusive } from './store.js';
+import { sync, syncNow } from './sync.js';
+import { drawOrders, drawPortfolio } from './tools.js';
 import { vault, owner, connectPhantom, disconnectPhantom, reconnectPhantom, fundFromPhantom, withdraw, liveBalance } from './wallet.js';
 import { AGENTS, impi, start, stop, peek, rules } from './impi.js';
 import { sell, sellAll, balance, heldSol } from './trader.js';
@@ -82,12 +84,12 @@ async function drawMoney() {
   $('s-pf').textContent = losses > 0 ? (gains / losses).toFixed(2) : gains > 0 ? '∞' : '—'; $('s-hold').textContent = held.length ? `${Math.round(held.reduce((a, b) => a + b, 0) / held.length)}m` : '—';
   $('s-best').className = 'up'; $('s-worst').className = 'down';
   $('positions').replaceChildren(...(open.length ? open.map((p) => { const tr = el('tr'), now = Number.isFinite(p.nowSol) ? p.nowSol : p.solIn, g = (now / p.solIn - 1) * 100, b = el('button', 'sell', 'Sell'); b.type = 'button';
-    b.addEventListener('click', async () => { b.disabled = true; try { await sell(p, 'manual'); } catch (e) { emit('say', { who: 'induna', text: `${p.symbol}: ${e.message}`, tone: 'down' }); } void drawMoney(); });
+    b.addEventListener('click', async () => { b.disabled = true; try { await exclusive(() => sell(p, 'manual')); } catch (e) { emit('say', { who: 'induna', text: `${p.symbol}: ${e.message}`, tone: 'down' }); } void drawMoney(); });
     const name = el('a', '', `${p.symbol}${p.dip ? ' · dip' : ''}`); name.href = `https://dexscreener.com/solana/${p.mint}`; name.target = '_blank'; name.rel = 'noopener';
     const px = p.last ?? p.entry, toStop = (p.stop / px - 1) * 100, toTgt = (p.target / px - 1) * 100, span = el('td', 'range'), bar = el('span', 'rbar'), mark = el('i'), at = Math.max(0, Math.min(1, (px - p.stop) / ((p.target - p.stop) || 1)));
     mark.className = `m${Math.round(at * 10)}`; bar.append(mark); span.append(el('span', 'down', pct(toStop)), bar, el('span', 'up', pct(toTgt)));
     const mins = Math.round((Date.now() - p.openedAt) / 60000);
-    tr.append(el('td'), el('td', '', p.solIn.toFixed(4)), el('td', '', now.toFixed(4)), el('td', g >= 0 ? 'up' : 'down', pct(g)), span, el('td', '', `${mins}m`), el('td', '', '')); tr.firstChild.append(name); if (p.empty) tr.firstChild.append(el('span', 'tagx', 'POOL EMPTY')); tr.lastChild.append(b); return tr; })
+    tr.append(el('td'), el('td', '', p.solIn.toFixed(4)), el('td', '', now.toFixed(4)), el('td', g >= 0 ? 'up' : 'down', pct(g)), span, el('td', '', `${mins}m`), el('td', '', '')); tr.firstChild.append(name); if (p.empty) tr.firstChild.append(el('span', 'tagx', 'POOL EMPTY')); const m = el('button', 'sell', 'Manage'); m.type = 'button'; m.addEventListener('click', () => emit('position-tools', p)); tr.lastChild.append(m, b); if (p.ownStop || p.ownTarget) tr.firstChild.append(el('span', 'tagx mine', 'MY EXITS')); return tr; })
     : [(() => { const tr = el('tr'), td = el('td', 'small', 'Nothing open. The impi buys only in the strike zone.'); td.colSpan = 7; tr.append(td); return tr; })()]));
 }
 on('equity', drawMoney); on('positions', drawMoney); on('trade', drawMoney); setInterval(() => { if (state.positions.length) void drawMoney(); }, 15_000);
@@ -108,14 +110,14 @@ let armed = 0;
 $('go').addEventListener('click', () => {
   if (impi.running) { stop(); drawControls(); return; }
   if (state.mode === 'live' && Date.now() - armed > 6000) { armed = Date.now(); $('go').textContent = 'Tap again: this trades REAL SOL'; setTimeout(drawControls, 6000); return; }
-  const why = start(); if (why) emit('say', { who: 'induna', text: why, tone: 'down' }); drawControls();
+  $('go').disabled = true; start().then((why) => { if (why) emit('say', { who: 'induna', text: why, tone: 'down' }); }).finally(() => { $('go').disabled = false; drawControls(); });
 });
 let outArmed = 0;
 $('out').addEventListener('click', async () => {
   if (!state.positions.some((p) => p.mode === state.mode)) { emit('say', { who: 'induna', text: 'Nothing is open to sell.' }); return; }
   // Live: a second tap within six seconds, so one stray tap never sells real positions.
   if (state.mode === 'live' && Date.now() - outArmed > 6000) { outArmed = Date.now(); $('out').textContent = 'Tap again: sell every LIVE position now'; setTimeout(() => { $('out').textContent = 'Get me out: sell everything'; }, 6000); return; }
-  $('out').disabled = true; try { await sellAll(); } finally { $('out').disabled = false; $('out').textContent = 'Get me out: sell everything'; void drawMoney(); }
+  $('out').disabled = true; try { await exclusive(sellAll); } catch (e) { emit('say', { who: 'induna', text: e.message, tone: 'down' }); } finally { $('out').disabled = false; $('out').textContent = 'Get me out: sell everything'; void drawMoney(); }
 });
 // The full history as a spreadsheet file: every sale, its costs already inside the result, practice and live marked.
 $('csv').addEventListener('click', () => {
@@ -150,7 +152,9 @@ async function drawWallet() {
     const row = el('div', 'row'), make = el('button', 'btn', 'Make my trading wallet'), rest = el('button', 'btn ghost', 'Restore from a backup key'); make.type = rest.type = 'button';
     make.addEventListener('click', () => ask({ title: 'Make your trading wallet', text: 'Choose a passphrase of 10+ characters (a few random words work well). It locks the wallet on this device.', fields: [{ id: 'p', label: 'PASSPHRASE', ac: 'new-password' }, { id: 'a', label: 'AGAIN', ac: 'new-password' }], action: 'Make wallet', run: async (v) => { vault.checkPassphrase(v.p, v.a); await vault.create(v.p); state.backedUp = false; save(); } }));
     rest.addEventListener('click', () => ask({ title: 'Restore a trading wallet', text: 'Paste the backup key (from Warrior or exported from Phantom) and choose a passphrase.', fields: [{ id: 'k', label: 'BACKUP KEY', type: 'text' }, { id: 'p', label: 'PASSPHRASE' }, { id: 'a', label: 'AGAIN' }], action: 'Restore', run: async (v) => { vault.checkPassphrase(v.p, v.a); await vault.restore(v.k.trim(), v.p); state.backedUp = true; save(); } }));
-    row.append(make, rest); box.append(row); return;
+    const other = el('button', 'btn ghost', 'Open my wallet from another device'); other.type = 'button';
+    other.addEventListener('click', () => ask({ title: 'Open your wallet from another device', text: 'Type the passphrase of the trading wallet you made on your other phone or computer. Warrior finds the locked copy that device synced and opens it here. Your passphrase never leaves this device; only an id made from it is sent.', fields: [{ id: 'p', label: 'PASSPHRASE' }], action: 'Find and open', run: async (v) => { await vault.fromOtherDevice(v.p); state.backedUp = true; save(); } }));
+    row.append(make, rest, other); box.append(row, syncLine()); return;
   }
   const copy = el('button', 'sell', 'Copy'), scan = el('a', 'small', 'Solscan'), who = el('div', 'addr', vault.address); copy.type = 'button'; scan.href = `https://solscan.io/account/${vault.address}`; scan.target = '_blank'; scan.rel = 'noopener';
   copy.addEventListener('click', async () => { try { await navigator.clipboard.writeText(vault.address); copy.textContent = 'Copied'; } catch { copy.textContent = 'Select it'; } setTimeout(() => { copy.textContent = 'Copy'; }, 1500); });
@@ -163,8 +167,12 @@ async function drawWallet() {
   add('Fund from Phantom', false, () => ask({ title: 'Send SOL from Phantom', text: owner.address ? 'Phantom will show the amount and ask you to approve.' : 'Connect Phantom first (top right).', fields: owner.address ? [{ id: 's', label: 'SOL TO SEND', type: 'number' }] : [], action: owner.address ? 'Send' : '', run: async (v) => { const r = await fundFromPhantom(Number(v.s)); return r.outcome === 'confirmed' ? `Sent. It is in the trading wallet.` : `Sent; the network says: ${r.outcome}. Check the balance in a minute.`; } }));
   if (vault.unlocked) add('Send to Phantom', true, () => ask({ title: 'Send SOL back', text: `To ${owner.address ? 'your connected Phantom' : 'the address below'}. Keep about 0.01 SOL for fees.`, fields: [{ id: 's', label: 'SOL TO SEND', type: 'number' }, ...(owner.address ? [] : [{ id: 'to', label: 'TO ADDRESS', type: 'text' }])], action: 'Send', run: async (v) => { const r = await withdraw(owner.address || v.to.trim(), Number(v.s)); return r.outcome === 'confirmed' ? 'Sent.' : `Sent; the network says: ${r.outcome}.`; } }));
   add(state.backedUp ? 'Backup key' : 'Save the backup key (needed for live)', !!state.backedUp, () => ask({ title: 'Your backup key', text: 'Type the passphrase to show it. Anyone with this key controls the wallet: never paste it into a website or chat.', fields: [{ id: 'p', label: 'PASSPHRASE' }], action: 'Show', run: async (v) => { const k = await vault.backup(v.p); state.backedUp = true; save(); return `Backup key: ${k}`; } }));
-  box.append(row);
+  box.append(row, syncLine());
 }
+function syncLine() { const p = el('p', 'small sync-line', sync.note); p.id = 'sync-status'; return p; }
+// Another device's copy arrived: take it in and redraw everything.
+on('synced', () => { reload(); drawControls(); void drawMoney(); drawOrders(); drawPortfolio(); });
+on('vault-open', () => void syncNow());
 
 // ---------- dark mode ----------
 function drawTheme() { const d = document.documentElement.dataset.theme === 'dark'; $('theme').setAttribute('aria-pressed', String(d)); $('theme').querySelector('.tt-l').textContent = d ? 'DARK' : 'LIGHT'; document.querySelector('meta[name=theme-color]').content = d ? '#120d1a' : '#fff8ec'; }
@@ -176,7 +184,7 @@ startNet($('net'), AGENTS); drawAgents(); drawControls(); drawWallet(); void dra
 for (const m of state.log.slice(-30)) { const a = AGENTS.find((x) => x.id === m.who), li = el('li', m.tone ?? ''); li.append(el('time', '', new Date(m.at).toLocaleTimeString()), el('span', 'who', a ? a.name.toUpperCase() : m.who), document.createTextNode(m.text)); $('log').prepend(li); }
 void reconnectPhantom();
 // A refresh stops the impi. Practice picks up again by itself; live waits for you to unlock the wallet and send it again.
-if (state.wasRunning && state.mode === 'paper') { const why = start(); if (!why) emit('say', { who: 'induna', text: 'Picked up where the impi left off (practice).' }); drawControls(); }
+if (state.wasRunning && state.mode === 'paper') start().then((why) => { if (!why) emit('say', { who: 'induna', text: 'Picked up where the impi left off (practice).' }); drawControls(); });
 else if (state.wasRunning) emit('say', { who: 'induna', text: 'The page was refreshed, so the live impi stopped. Unlock the wallet and send it again to keep watching your positions.', tone: 'down' });
 void peek(); setInterval(() => { if (!impi.running && document.visibilityState === 'visible') void peek(); }, 120_000);
 // The tab title shows equity and open positions at a glance.

@@ -2,12 +2,15 @@
 //  - Phantom (yours): connected only to send SOL into the trading wallet. Phantom asks you to approve every transfer.
 //  - The trading wallet: made in this browser, its key locked with your passphrase (AES-256-GCM, PBKDF2 600,000 rounds).
 //    It lives in this tab's memory only while unlocked. The key is never sent anywhere; only signed transactions leave.
-import { Keypair, Transaction, SystemProgram, PublicKey } from '/vendor/solana.js';
+import { Keypair, Transaction, SystemProgram, PublicKey, ed25519 } from '/vendor/solana.js';
+import { lookupId, portableRecord } from '/vendor/lib/sync.js';
 import { sealWallet, openWallet, isSealed, passphraseProblems, toBase58, parseBackupKey } from '/vendor/lib/vault.js';
 import { api, post, sleep, emit } from './store.js';
 
 const WKEY = 'warrior.wallet.v1';
-let record = null, keypair = null;
+let record = null, keypair = null, dataKey = null, syncId = null;
+// Once open: work out the id the locked copy is filed under on the server (it needs the passphrase), and tell sync.
+const opened = (p) => { emit('wallet'); emit('vault-open'); if (p) void lookupId(p).then((id) => { syncId = id; emit('vault-sync-id'); }).catch(() => {}); };
 try { const r = JSON.parse(localStorage.getItem(WKEY) ?? 'null'); if (isSealed(r)) record = r; } catch { /* none yet */ }
 const store = () => localStorage.setItem(WKEY, JSON.stringify(record));
 
@@ -15,10 +18,18 @@ export const vault = {
   get exists() { return !!record; }, get unlocked() { return !!keypair; }, get keypair() { return keypair; },
   get address() { return record?.address ?? ''; },
   checkPassphrase(p, again) { const bad = passphraseProblems(p); if (bad.length) throw new Error(bad[0]); if (p !== again) throw new Error('The two passphrases do not match'); },
-  async create(p) { if (record) throw new Error('A trading wallet already exists here'); const kp = Keypair.generate(); record = (await sealWallet(kp.secretKey, p, kp.publicKey.toBase58())).record; keypair = kp; store(); emit('wallet'); },
-  async restore(text, p) { if (record) throw new Error('A trading wallet already exists here'); const secret = parseBackupKey(text); if (!secret) throw new Error('That is not a backup key'); const kp = Keypair.fromSecretKey(secret); record = (await sealWallet(secret, p, kp.publicKey.toBase58())).record; keypair = kp; store(); emit('wallet'); },
-  async unlock(p) { keypair = Keypair.fromSecretKey((await openWallet(record, p)).secret); emit('wallet'); },
-  lock() { keypair = null; emit('wallet'); },
+  async create(p) { if (record) throw new Error('A trading wallet already exists here'); const kp = Keypair.generate(), made = await sealWallet(kp.secretKey, p, kp.publicKey.toBase58()); record = made.record; dataKey = made.dataKey; keypair = kp; store(); opened(p); },
+  async restore(text, p) { if (record) throw new Error('A trading wallet already exists here'); const secret = parseBackupKey(text); if (!secret) throw new Error('That is not a backup key'); const kp = Keypair.fromSecretKey(secret), made = await sealWallet(secret, p, kp.publicKey.toBase58()); record = made.record; dataKey = made.dataKey; keypair = kp; store(); opened(p); },
+  async unlock(p) { const o = await openWallet(record, p); keypair = Keypair.fromSecretKey(o.secret); dataKey = o.dataKey; opened(p); },
+  lock() { keypair = null; dataKey = null; syncId = null; emit('wallet'); emit('vault-locked'); },
+  // ---------- for sync between devices ----------
+  get protected() { return true; }, get syncId() { return syncId; }, get syncKey() { return dataKey; }, get portable() { return record ? portableRecord(record) : null; },
+  /** Sign a sync request; only an unlocked wallet can. Base64. */
+  sign(text) { if (!keypair) throw new Error('Unlock the wallet first'); const sig = ed25519.sign(new TextEncoder().encode(text), keypair.secretKey.slice(0, 32)); return btoa(String.fromCharCode(...sig)); },
+  /** A new device: keep the locked copy found on the server, then open it with the passphrase. */
+  async adopt(found, p) { if (record) throw new Error('A trading wallet already exists here'); const o = await openWallet(found, p); const kp = Keypair.fromSecretKey(o.secret); if (kp.publicKey.toBase58() !== found.address) throw new Error('That wallet copy is damaged'); record = { ...found, passkey: null }; store(); keypair = kp; dataKey = o.dataKey; opened(p); },
+  /** Find the locked copy another device synced, by its passphrase (only an id made from it is sent), and open it here. */
+  async fromOtherDevice(p) { const id = await lookupId(p), r = await fetch('/api/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ op: 'find', id }) }), j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error ?? 'Sync is unavailable right now'); if (!j.record) throw new Error('No synced wallet has that passphrase. Open Warrior on the other device, unlock the wallet there once, then try again'); await vault.adopt(j.record, p); },
   async backup(p) { return toBase58((await openWallet(record, p)).secret); }
 };
 
