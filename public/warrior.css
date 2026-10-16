@@ -140,3 +140,40 @@ dialog::backdrop{background:rgba(27,18,48,.35)}
 @media (max-width:1100px){.col{display:contents}}
 .stats{column-gap:12px}
 .stats dt{line-height:1.25}
+
+/* theme toggle, beside the tag */
+.theme-t{display:inline-flex;align-items:center;gap:8px;font:700 11px var(--mono);letter-spacing:.14em;color:var(--soft);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px 10px 3px 3px;min-height:28px;cursor:pointer}
+.theme-t .knob{width:34px;height:20px;border-radius:999px;background:#eadfcc;position:relative;flex:none}
+.theme-t .knob::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--road);transition:transform .2s}
+.theme-t[aria-pressed=true] .knob{background:#2c2240}
+.theme-t[aria-pressed=true] .knob::after{transform:translateX(14px)}
+.theme-t:focus-visible{outline:3px solid var(--r3);outline-offset:2px}
+
+/* dark mode: night beadwork */
+:root[data-theme=dark]{--paper:#120d1a;--card:#1a1424;--ink:#f4ecff;--soft:#b3a3c9;--line:#33294a;--up:#3ddc97;--down:#ff5a6e;color-scheme:dark}
+:root[data-theme=dark] html,:root[data-theme=dark]{color-scheme:dark}
+:root[data-theme=dark] body{background:linear-gradient(168deg,transparent 0 90px,rgba(230,57,70,.12) 90px 118px,rgba(247,127,0,.12) 118px 146px,rgba(252,191,73,.10) 146px 174px,rgba(42,157,143,.12) 174px 202px,rgba(29,112,224,.12) 202px 230px,rgba(123,44,191,.14) 230px 258px,transparent 258px),var(--paper)}
+:root[data-theme=dark] a{color:#c99bff}
+:root[data-theme=dark] .mark{color:var(--ink)}
+:root[data-theme=dark] .tag,:root[data-theme=dark] .ticker-run,:root[data-theme=dark] .seg,:root[data-theme=dark] .btn.ghost,:root[data-theme=dark] .book .sell{background:var(--card);color:var(--ink);border-color:var(--line)}
+:root[data-theme=dark] .ticker-run b{color:#c99bff}
+:root[data-theme=dark] .seg-b{color:var(--soft)}
+:root[data-theme=dark] .seg-b.on{color:#fff}
+:root[data-theme=dark] .card{box-shadow:0 4px 18px rgba(0,0,0,.35)}
+:root[data-theme=dark] .agent{background:#201930;border-color:var(--line)}
+:root[data-theme=dark] .book td{border-bottom-color:#2a2139}
+:root[data-theme=dark] .book tr.hot td{background:#3a1622}
+:root[data-theme=dark] .term{background:#150f1f;border-color:var(--line)}
+:root[data-theme=dark] .term li{border-bottom-color:#2a2139}
+:root[data-theme=dark] .term li.up{color:#3ddc97}
+:root[data-theme=dark] .term li.down{color:#ff7a8a}
+:root[data-theme=dark] input{background:#150f1f;color:var(--ink);border-color:var(--line)}
+:root[data-theme=dark] .warn{background:#2e1420;border-color:#5c2236;color:var(--ink)}
+:root[data-theme=dark] dialog{background:var(--card);color:var(--ink)}
+:root[data-theme=dark] dialog::backdrop{background:rgba(0,0,0,.6)}
+:root[data-theme=dark] .fig.c2{color:#fcbf49}
+:root[data-theme=dark] .fig.c5{color:#b57bff}
+:root[data-theme=dark] .fig.c4{color:#5aa2ff}
+:root[data-theme=dark] .rbar{background:linear-gradient(90deg,var(--down),#3a2f50 50%,var(--up))}
+:root[data-theme=dark] .rbar i{background:var(--ink)}
+:root[data-theme=dark] .card::after{opacity:.9}

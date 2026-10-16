@@ -6,7 +6,9 @@ let canvas, ctx, agents = [], pulses = [], glow = {}, raf = 0, t0 = performance.
 let data = { agents: {}, top: '', bottom: '', running: false, nextAt: 0, slots: [0, 1] };
 export function setData(d) { data = { ...data, ...d }; }
 const MONO = 'ui-monospace,Consolas,monospace';
-function chip(text, x, y, c, size = 11) { ctx.font = `700 ${size}px ${MONO}`; const w = ctx.measureText(text).width + 12, h = size + 8; ctx.fillStyle = '#fff'; ctx.strokeStyle = c; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2) : ctx.rect(x - w / 2, y - h / 2, w, h); ctx.fill(); ctx.stroke(); ctx.fillStyle = c; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y + 1); }
+const dark = () => document.documentElement.dataset.theme === 'dark';
+const P = () => dark() ? { node: '#1c1628', orb: '#150f20', ink: '#f4ecff', soft: '#b3a3c9', faint: 'rgba(244,236,255,' } : { node: '#fff', orb: '#fffaf0', ink: '#1b1230', soft: '#6b5a7e', faint: 'rgba(27,18,48,' };
+function chip(text, x, y, c, size = 11) { ctx.font = `700 ${size}px ${MONO}`; const w = ctx.measureText(text).width + 12, h = size + 8; ctx.fillStyle = P().node; ctx.strokeStyle = c; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2) : ctx.rect(x - w / 2, y - h / 2, w, h); ctx.fill(); ctx.stroke(); ctx.fillStyle = c; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y + 1); }
 const still = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export function startNet(el, list) {
@@ -32,7 +34,7 @@ function draw() {
   // threads: every agent to the centre, and around the ring
   nodes.forEach((n, i) => {
     const m = nodes[(i + 1) % nodes.length];
-    ctx.strokeStyle = 'rgba(27,18,48,.08)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(n.x, n.y); ctx.lineTo(m.x, m.y); ctx.stroke();
+    ctx.strokeStyle = P().faint + '.08)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(n.x, n.y); ctx.lineTo(m.x, m.y); ctx.stroke();
     const g = ctx.createLinearGradient(n.x, n.y, cx, cy); g.addColorStop(0, n.c + 'aa'); g.addColorStop(1, n.c + '10'); ctx.strokeStyle = g; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(n.x, n.y); ctx.lineTo(cx, cy); ctx.stroke();
   });
   // data flowing along every thread toward the shield while the impi is out
@@ -45,20 +47,20 @@ function draw() {
   const ring = ctx.createConicGradient ? ctx.createConicGradient(now / 3000, cx, cy) : null;
   if (ring) { ['#e63946', '#f77f00', '#fcbf49', '#2a9d8f', '#1d70e0', '#7b2cbf', '#d81b60', '#e63946'].forEach((c, i, a) => ring.addColorStop(i / (a.length - 1), c)); ctx.strokeStyle = ring; } else ctx.strokeStyle = '#7b2cbf';
   ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
-  ctx.fillStyle = '#fffaf0'; ctx.beginPath(); ctx.arc(cx, cy, r - 3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = P().orb; ctx.beginPath(); ctx.arc(cx, cy, r - 3, 0, Math.PI * 2); ctx.fill();
   if (logo.complete && logo.naturalWidth) ctx.drawImage(logo, cx - r * 0.5, cy - r * 0.78, r, r);
   // gauge 1 (outer): time to the next round; gauge 2: positions open out of the most allowed
   ctx.lineCap = 'round';
   const left = data.nextAt ? Math.max(0, Math.min(1, (data.nextAt - Date.now()) / 60000)) : 0;
-  ctx.strokeStyle = 'rgba(27,18,48,.08)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx, cy, r + 12, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = P().faint + '.08)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx, cy, r + 12, 0, Math.PI * 2); ctx.stroke();
   if (left) { ctx.strokeStyle = '#1d70e0'; ctx.beginPath(); ctx.arc(cx, cy, r + 12, -Math.PI / 2, -Math.PI / 2 + left * Math.PI * 2); ctx.stroke(); }
   const [used, max] = data.slots; for (let k = 0; k < max; k++) { const a0 = Math.PI * 0.15 + k * (Math.PI * 0.7 / max), a1 = a0 + Math.PI * 0.7 / max - 0.06; ctx.strokeStyle = k < used ? '#d81b60' : 'rgba(216,27,96,.15)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(cx, cy, r + 22, a0, a1); ctx.stroke(); }
   ctx.lineCap = 'butt';
   // tick marks like a dial
-  for (let k = 0; k < 60; k++) { const a = k / 60 * Math.PI * 2, l = k % 5 ? 3 : 7; ctx.strokeStyle = 'rgba(27,18,48,.18)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * (r + 30), cy + Math.sin(a) * (r + 30)); ctx.lineTo(cx + Math.cos(a) * (r + 30 + l), cy + Math.sin(a) * (r + 30 + l)); ctx.stroke(); }
+  for (let k = 0; k < 60; k++) { const a = k / 60 * Math.PI * 2, l = k % 5 ? 3 : 7; ctx.strokeStyle = P().faint + '.18)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * (r + 30), cy + Math.sin(a) * (r + 30)); ctx.lineTo(cx + Math.cos(a) * (r + 30 + l), cy + Math.sin(a) * (r + 30 + l)); ctx.stroke(); }
   // read-outs inside the shield
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  if (data.top) { ctx.fillStyle = '#1b1230'; ctx.font = `800 ${Math.max(11, r * 0.17)}px ${MONO}`; ctx.fillText(data.top, cx, cy + r * 0.42); }
+  if (data.top) { ctx.fillStyle = P().ink; ctx.font = `800 ${Math.max(11, r * 0.17)}px ${MONO}`; ctx.fillText(data.top, cx, cy + r * 0.42); }
   if (data.mid) { ctx.fillStyle = data.midUp ? '#12a066' : '#d62839'; ctx.font = `700 ${Math.max(10, r * 0.13)}px ${MONO}`; ctx.fillText(data.mid, cx, cy + r * 0.64); }
   // corner read-outs, clear of the orbiting agents
   const cw = (t) => { ctx.font = `700 10px ${MONO}`; return ctx.measureText(t).width + 12; };
@@ -72,10 +74,10 @@ function draw() {
   for (const n of nodes) {
     const lit = Math.max(0, 1 - (now - (glow[n.id] ?? 0)) / 1800), rad = 22 + lit * 6;
     ctx.fillStyle = n.c + '22'; ctx.beginPath(); ctx.arc(n.x, n.y, rad + 10 * lit, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.strokeStyle = n.c; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(n.x, n.y, rad, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = P().node; ctx.strokeStyle = n.c; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(n.x, n.y, rad, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = n.c; ctx.font = '700 15px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(n.glyph, n.x, n.y + 1);
-    ctx.fillStyle = '#1b1230'; ctx.font = '700 10px ui-monospace,Consolas,monospace'; ctx.fillText(n.name.toUpperCase(), n.x, n.y + rad + 12);
-    ctx.fillStyle = '#6b5a7e'; ctx.font = '10px ui-monospace,Consolas,monospace'; ctx.fillText(n.role, n.x, n.y + rad + 24);
+    ctx.fillStyle = P().ink; ctx.font = '700 10px ui-monospace,Consolas,monospace'; ctx.fillText(n.name.toUpperCase(), n.x, n.y + rad + 12);
+    ctx.fillStyle = P().soft; ctx.font = '10px ui-monospace,Consolas,monospace'; ctx.fillText(n.role, n.x, n.y + rad + 24);
     const d = data.agents[n.id]; if (d) chip(d, n.x, n.y - rad - 14, n.c, 10);
   }
 }

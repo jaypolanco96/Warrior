@@ -166,6 +166,11 @@ async function drawWallet() {
   box.append(row);
 }
 
+// ---------- dark mode ----------
+function drawTheme() { const d = document.documentElement.dataset.theme === 'dark'; $('theme').setAttribute('aria-pressed', String(d)); $('theme').querySelector('.tt-l').textContent = d ? 'DARK' : 'LIGHT'; document.querySelector('meta[name=theme-color]').content = d ? '#120d1a' : '#fff8ec'; }
+$('theme').addEventListener('click', () => { const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = t; try { localStorage.setItem('warrior.theme', t); } catch { /* not kept */ } drawTheme(); if (impi.lastScan) emit('scan', impi.lastScan); void drawMoney(); });
+drawTheme();
+
 // ---------- start ----------
 startNet($('net'), AGENTS); drawAgents(); drawControls(); drawWallet(); void drawMoney();
 for (const m of state.log.slice(-30)) { const a = AGENTS.find((x) => x.id === m.who), li = el('li', m.tone ?? ''); li.append(el('time', '', new Date(m.at).toLocaleTimeString()), el('span', 'who', a ? a.name.toUpperCase() : m.who), document.createTextNode(m.text)); $('log').prepend(li); }
