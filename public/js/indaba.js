@@ -25,12 +25,12 @@ function openCase({ symbol, facts }) {
   current = symbol; const box = $('indaba-case'); box.replaceChildren(el('b', '', symbol), ...facts.map((f) => el('span', '', f)));
   $('indaba').replaceChildren();
 }
-function speak({ who, text, tone = 'wait', chip, verdict }) {
+function speak({ who, text, tone = 'wait', chip, verdict, count = true }) {
   const i = AGENTS.findIndex((a) => a.id === who), a = AGENTS[i]; if (!a) return;
   const li = el('li', `msg${verdict ? ` verdict ${tone}` : ''}`), av = el('div', `av c${i}`, a.glyph), bub = el('div', 'bubble'), head = el('div', `who c${i}`, a.name.toUpperCase());
   head.append(el('span', 'role', a.role)); if (chip) head.append(el('span', `chip ${tone}`, chip));
   const tx = el('div', 'txt'); bub.append(head, tx); li.append(av, bub); $('indaba').append(li);
-  if (verdict) { tally[chip === 'BUY' ? 'BUY' : chip === 'NO' ? 'NO' : 'WAIT']++; drawTally(); }
+  if (verdict && count) { tally[chip === 'BUY' ? 'BUY' : chip === 'NO' ? 'NO' : 'WAIT']++; drawTally(); }
   const box = $('indaba'), end = () => { box.scrollTop = box.scrollHeight; };
   if (still()) { tx.textContent = text; end(); return; }
   typing = true; tx.classList.add('cursor'); let n = 0;

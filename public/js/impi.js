@@ -50,6 +50,7 @@ async function round() {
       emit('indaba-line', { who: 'induna', text: `${lost && lost.pnlSol < 0 ? 'Sold at a loss recently: the rule is 6 hours after a loss' : 'Bought or sold recently: the coin is resting'}. NOT NOW. Free again at ${until}.`, tone: 'wait', chip: 'WAIT', verdict: true });
     }
     const picks = read.filter((t) => t.analysis?.decision === 'enter' && !owned.has(t.mint) && !((state.cooldown[t.mint] ?? 0) > Date.now()) && !(t.analysis.style === 'smart' && live()));
+    if (!picks.length) roundTalk(scan, read, R);
     say('umkhonto', picks.length ? `Strike: ${picks.map((t) => `${t.symbol} (${t.analysis.dipNote ?? t.analysis.smartNote ?? 'signals agree'})`).join('; ')}.` : 'No coin is in the strike zone. Waiting is a position too.');
     // 5. the commander
     const bal = await balance(), equity = bal + heldSol(), start = rollDay(equity);
@@ -64,6 +65,18 @@ async function round() {
   finally { lock.busy = false; }
   // the scorecard: all three strengths, side by side, on pretend money (it never trades)
   if (running) void shadowRound({ [state.preset]: last }).catch(() => {});
+}
+/** A round with no coin to buy is still decided out loud in the indaba: what was seen, refused, and the nearest misses. */
+function roundTalk(scan, read, R) {
+  const s = R.settings, line = (who, text, tone = 'wait', chip, verdict = false) => emit('indaba-line', { who, text, tone, chip, verdict });
+  const near = read.filter((t) => Number.isFinite(t.analysis?.stretchPct) && t.analysis.stretchPct < 0).sort((a, b) => a.analysis.stretchPct - b.analysis.stretchPct).slice(0, 2);
+  emit('indaba-case', { symbol: `ROUND ${rounds}`, facts: [`${scan.universe} watched`, `${scan.passedScreen} passed the shield`, `${read.length} read closely`, `${state.preset}`] });
+  line('inhloli', `${scan.universe} coins on the lists. ${read.length} read closely: the busiest and the ones dropping.`);
+  line('isihlangu', `${scan.rejected} refused at the screen (pool size, trading, age, locked pool money). ${scan.passedScreen} passed.`, 'yes', 'SCREEN');
+  for (const t of near) { const a = t.analysis, deep = Math.abs(a.stretchPct) >= s.dipBelowPct, low = Number.isFinite(a.rsi) && a.rsi <= s.dipRsi;
+    line('umkhonto', `Closest: ${t.symbol}, ${Math.abs(a.stretchPct).toFixed(1)}% under its average (needs ${s.dipBelowPct}%), RSI ${Number.isFinite(a.rsi) ? a.rsi.toFixed(0) : '?'} (needs ${s.dipRsi} or lower). ${deep && low ? (a.reasons?.[0] ?? 'Another rule says no') + '.' : `Not ${!deep && !low ? 'deep or oversold' : !deep ? 'deep' : 'oversold'} enough yet.`}`, 'wait', 'MISS'); }
+  if (!near.length) line('umkhonto', 'No coin read closely is under its average right now.', 'wait', 'MISS');
+  emit('indaba-line', { who: 'induna', text: 'NOTHING TO STRIKE. Waiting is a position too. Next round in a minute.', tone: 'wait', chip: 'WAIT', verdict: true, count: false });
 }
 async function guard() { if (lock.busy) return; lock.busy = true; try { await watch(rules()); emit('positions'); } catch { /* next time */ } finally { lock.busy = false; } }
 
