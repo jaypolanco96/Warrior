@@ -25,11 +25,22 @@ export const vault = {
 // ---------- Phantom ----------
 const phantom = () => window.phantom?.solana ?? (window.solana?.isPhantom ? window.solana : null);
 export const owner = { address: '' };
+const REMEMBER = 'warrior.phantom.v1';
 export async function connectPhantom() {
   const p = phantom(); if (!p) { window.open('https://phantom.com/download', '_blank', 'noopener'); throw new Error('Phantom is not installed in this browser'); }
-  const r = await p.connect(); owner.address = r.publicKey.toString(); emit('wallet'); return owner.address;
+  const r = await p.connect(); owner.address = r.publicKey.toString(); try { localStorage.setItem(REMEMBER, '1'); } catch { /* not remembered */ } emit('wallet'); return owner.address;
 }
-export async function disconnectPhantom() { try { await phantom()?.disconnect(); } catch { /* already gone */ } owner.address = ''; emit('wallet'); }
+export async function disconnectPhantom() { try { await phantom()?.disconnect(); } catch { /* already gone */ } try { localStorage.removeItem(REMEMBER); } catch { /* fine */ } owner.address = ''; emit('wallet'); }
+/**
+ * After a refresh: reconnect Phantom silently if you connected it before and still trust this site in Phantom
+ * (onlyIfTrusted never opens a popup). Phantom injects itself a moment after the page loads, so this waits for it briefly.
+ */
+export async function reconnectPhantom() {
+  let remembered = false; try { remembered = localStorage.getItem(REMEMBER) === '1'; } catch { /* blocked */ } if (!remembered) return;
+  for (let i = 0; i < 20 && !phantom(); i++) await sleep(150);
+  const p = phantom(); if (!p) return;
+  try { const r = await p.connect({ onlyIfTrusted: true }); owner.address = r.publicKey.toString(); emit('wallet'); } catch { /* not trusted any more: the button stays */ }
+}
 
 /** Wait for the network's answer about a transaction: 'confirmed', 'failed' or 'unknown'. Never resends. */
 export async function waitFor(signature) {
