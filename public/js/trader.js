@@ -100,7 +100,7 @@ export async function sell(p, reason, fraction = 1) {
   state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, solIn: cost, solOut: out, pnlSol: pnl, pnlPct: pnl / cost * 100, reason, style: p.style, partial: !whole, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules, costPct: p.costPct ?? null, preset: String(p.rules ?? state.preset).split(/[-+~]/)[0], peakPct: Number.isFinite(p.peak) && p.entry > 0 ? (p.peak / p.entry - 1) * 100 : null, depthPct: p.depth ?? null, px: p.last ?? null });
   if (whole) { state.positions = state.positions.filter((x) => x !== p); const R = resolveRules({ preset: state.preset, adapt: dials() }).risk; state.cooldown[p.mint] = Math.max(Date.now() + (pnl < 0 ? R.lossCooldownMinutes : R.cooldownMinutes) * 60_000, p.dip === 1 ? p.openedAt + DIP_REPEAT_HOURS * 3_600_000 : 0); } // the same waits as Laugh
   else { p.solIn -= cost; p.tokenRaw = (held - raw).toString(); delete p.nowSol; } // the old value was for the whole position
-  save(); emit('trade', { side: 'sell', symbol: p.symbol, pnl, mint: p.mint, pool: p.pool, px: p.last ?? null, reason, whole });
+  save(); emit('trade', { side: 'sell', symbol: p.symbol, pnl, mint: p.mint, pool: p.pool, px: p.last ?? null, reason, whole, preset: String(p.rules ?? state.preset).split(/[-+~]/)[0] });
   say('umlobi', `SELL ${p.symbol}${whole ? '' : ` (${Math.round(fraction * 100)}%)`}: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} SOL (${(pnl / cost * 100).toFixed(1)}%) · ${reason}${rent > 0 ? ` · ${rent.toFixed(4)} SOL of account rent back` : ''}.`, pnl >= 0 ? 'up' : 'down');
   return true;
 }

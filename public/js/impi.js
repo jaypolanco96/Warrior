@@ -50,7 +50,7 @@ async function round() {
       const until = new Date(state.cooldown[t.mint]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), lost = state.trades.findLast?.((x) => x.mint === t.mint && !x.partial);
       emit('indaba-case', { symbol: t.symbol, facts: [t.analysis.dipNote ?? 'signals agree'] });
       emit('indaba-line', { who: 'umkhonto', text: `${t.analysis.dipNote ?? 'The signals agree'}. The rule says strike.`, tone: 'yes', chip: 'STRIKE' });
-      emit('indaba-line', { who: 'induna', text: `${lost && lost.pnlSol < 0 ? 'Sold at a loss recently: the rule is 6 hours after a loss' : 'Bought or sold recently: the coin is resting'}. NOT NOW. Free again at ${until}.`, tone: 'wait', chip: 'WAIT', verdict: true });
+      emit('indaba-line', { who: 'induna', text: `${lost && lost.pnlSol < 0 ? `Sold at a loss recently: the rule is ${+(rules().risk.lossCooldownMinutes / 60).toFixed(1)} hours after a loss` : 'Bought or sold recently: the coin is resting'}. NOT NOW. Free again at ${until}.`, tone: 'wait', chip: 'WAIT', verdict: true });
     }
     const picks = read.filter((t) => t.analysis?.decision === 'enter' && !owned.has(t.mint) && !((state.cooldown[t.mint] ?? 0) > Date.now()) && !(t.analysis.style === 'smart' && live()));
     if (!picks.length) roundTalk(scan, read, R);
@@ -68,7 +68,7 @@ async function round() {
   } catch (e) { say('inhloli', `This round could not run (${e.message}). Trying again in a minute; nothing was traded.`, 'down'); }
   finally { lock.busy = false; }
   // the scorecard: all three strengths, side by side, on pretend money (it never trades)
-  if (running) void shadowRound({ [state.preset]: last }).catch(() => {});
+  if (running) void shadowRound(Object.keys(dials()).length ? {} : { [state.preset]: last }).catch(() => {});
 }
 /** A round with no coin to buy is still decided out loud in the indaba: what was seen, refused, and the nearest misses. */
 function roundTalk(scan, read, R) {

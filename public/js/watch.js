@@ -20,9 +20,9 @@ on('missed', ({ mint, symbol, price, rule, gap }) => {
   const s = resolveRules({ preset: state.preset }).settings;
   w.missed.push({ mint, symbol, rule, gap: Number.isFinite(gap) ? gap : null, preset: state.preset, mode: state.mode, p0: price, at: Date.now(), max: price, min: price, last: price, stop: s.dipStopPct, target: s.targetPct, hit: null, done: false }); trim(w.missed); save();
 });
-on('trade', ({ side, mint, symbol, px, reason, whole } = {}) => {
+on('trade', ({ side, mint, symbol, px, reason, whole, preset } = {}) => {
   if (side !== 'sell' || !whole || !Number.isFinite(px) || px <= 0) return;
-  const w = book(); w.after.push({ mint, symbol, reason, preset: state.preset, mode: state.mode, p0: px, at: Date.now(), max: px, min: px, last: px, done: false }); trim(w.after); save();
+  const w = book(); w.after.push({ mint, symbol, reason, preset: preset ?? state.preset, mode: state.mode, p0: px, at: Date.now(), max: px, min: px, last: px, done: false }); trim(w.after); save();
 });
 on('dip-seen', ({ mint, symbol, price }) => {
   const w = book(); if (fresh(w.dips, mint, DIP_WINDOW)) return;
