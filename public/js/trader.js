@@ -12,6 +12,10 @@ import { vault, waitFor, liveBalance } from './wallet.js';
 
 export const live = () => state.mode === 'live';
 const say = (who, text, tone) => emit('say', { who, text, tone });
+// The indaba: each check of a buy, spoken by its agent (display only).
+const talk = (who, text, tone = 'wait', chip, verdict = false) => emit('indaba-line', { who, text: text.charAt(0).toUpperCase() + text.slice(1), tone, chip, verdict });
+const usd = (n) => !Number.isFinite(n) ? '—' : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}K` : `$${Math.round(n)}`;
+const pctx = (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
 const b64 = (bytes) => btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''));
 const mine = () => state.positions.filter((p) => p.mode === state.mode);
 
@@ -37,26 +41,33 @@ async function swap(quoteResponse, exit) {
  */
 export async function buy(t, rules) {
   const a = t.analysis, r = rules.risk, bal = await balance(), equity = bal + heldSol();
+  emit('indaba-case', { symbol: t.symbol, facts: [Number.isFinite(a.stretchPct) ? `${pctx(a.stretchPct)} vs 20-candle avg` : null, Number.isFinite(a.rsi) ? `RSI ${a.rsi.toFixed(0)}` : null, `vol 1h ${usd(t.volume1hUsd)}`, `pool ${usd(t.liquidityUsd)}`].filter(Boolean) });
+  talk('inhloli', `${t.symbol}: ${pctx(t.change?.m5 ?? 0)} in 5 minutes, ${pctx(t.change?.h1 ?? 0)} over the hour, ${usd(t.volume1hUsd)} traded in the hour. Reading it closely.`);
+  talk('umkhonto', a.dipNote ? `${a.dipNote}. That is the tested deep dip.` : a.smartNote ?? 'The signals agree.', 'yes', 'STRIKE');
+  if ((t.smart?.count ?? 0) > 0) talk('izinyoni', `${t.smart.count} listed smart wallet${t.smart.count === 1 ? '' : 's'} bought in the last 15 minutes.`, 'yes', `+${t.smart.count}`);
   const size = positionSize({ balanceSol: bal, equitySol: equity, stopPct: a.stopPct ?? 10, openPositions: mine().length, dayPnlSol: 0, sizeFactor: a.sizeFactor ?? 1 }, r);
-  if (!size.sol) { say('induna', `${t.symbol}: no room. ${size.reasons.join('; ')}.`); return false; }
+  if (!size.sol) { say('induna', `${t.symbol}: no room. ${size.reasons.join('; ')}.`); talk('induna', `NOT NOW. ${size.reasons.join('; ')}.`, 'wait', 'WAIT', true); return false; }
+  talk('induna', `${mine().length} of ${r.maxOpenPositions} slots in use. Size ${size.sol.toFixed(3)} SOL: a ${(a.stopPct ?? 10).toFixed(0)}% stop risks about ${(size.sol * (a.stopPct ?? 10) / equity).toFixed(1)}% of the wallet.`, 'yes', 'ROOM');
   const safety = await api(`/api/coin?what=mint&mint=${t.mint}`);
-  if (!safety.safe) { say('isihlangu', `${t.symbol} refused: ${safety.reason}.`, 'down'); state.cooldown[t.mint] = Date.now() + 6 * 3_600_000; return false; }
-  let launch; try { launch = await api(`/api/coin?what=audit&mint=${t.mint}&level=${state.preset}`); } catch { say('isihlangu', `${t.symbol}: its launch record could not be read, so no buy. Unknown is not safe.`); return false; }
-  if (!launch.ok) { say('isihlangu', `${t.symbol} refused: ${launch.reasons.join('. ')}.`, 'down'); state.cooldown[t.mint] = Date.now() + 24 * 3_600_000; return false; }
+  if (!safety.safe) { talk('isihlangu', `${safety.reason}.`, 'no', 'FAIL'); talk('induna', 'REFUSED. Not again for 6 hours.', 'no', 'NO', true); say('isihlangu', `${t.symbol} refused: ${safety.reason}.`, 'down'); state.cooldown[t.mint] = Date.now() + 6 * 3_600_000; return false; }
+  talk('isihlangu', 'No freeze or mint power on the token.', 'yes', 'PASS');
+  let launch; try { launch = await api(`/api/coin?what=audit&mint=${t.mint}&level=${state.preset}`); } catch { talk('isihlangu', 'Its launch record could not be read. Unknown is not safe.', 'no', 'FAIL'); talk('induna', 'NOT NOW. Trying again next round.', 'wait', 'WAIT', true); say('isihlangu', `${t.symbol}: its launch record could not be read, so no buy. Unknown is not safe.`); return false; }
+  if (!launch.ok) { talk('isihlangu', `${launch.reasons.join('. ')}.`, 'no', 'FAIL'); talk('induna', 'REFUSED. Not again for 24 hours.', 'no', 'NO', true); say('isihlangu', `${t.symbol} refused: ${launch.reasons.join('. ')}.`, 'down'); state.cooldown[t.mint] = Date.now() + 24 * 3_600_000; return false; }
   const lamports = Math.round(size.sol * 1e9); let q, got, spent = size.sol, sig = 'practice', costPct = null;
   // If the buy fails on-chain (the price moved past the slippage limit), nothing was bought: it is tried once more at a fresh price.
   for (let attempt = 1; ; attempt++) {
     q = await api(`/api/quote?${new URLSearchParams({ inputMint: SOL, outputMint: t.mint, amount: String(lamports), slip: String(r.slippageBps) })}`);
-    if (!q.check.ok) { say('induna', `${t.symbol}: ${q.check.reasons.join('; ')}. Waiting.`); return false; }
+    if (!q.check.ok) { talk('induna', `NOT NOW. ${q.check.reasons.join('; ')}.`, 'wait', 'WAIT', true); say('induna', `${t.symbol}: ${q.check.reasons.join('; ')}. Waiting.`); return false; }
+    if (attempt === 1) talk('isihlangu', 'Launch record clean: no bundled buys or staged launch.', 'yes', 'PASS');
     const back = await api(`/api/quote?${new URLSearchParams({ inputMint: t.mint, outputMint: SOL, amount: q.quote.outAmount, exit: '1' })}`), loss = (1 - Number(back.quote.outAmount) / lamports) * 100;
     // Selling straight back must cost 3% or less. Most watched coins cost under 1%; a coin costing more has to rise a long way just to break even.
-    if (!(loss <= 3)) { say('isihlangu', `${t.symbol} refused: selling straight back would cost ${loss.toFixed(1)}% (the limit is 3%).`, 'down'); state.cooldown[t.mint] = Date.now() + 3_600_000; return false; }
-    costPct = Math.max(0, loss);
+    if (!(loss <= 3)) { talk('isihlangu', `Selling straight back would cost ${loss.toFixed(2)}%. The limit is 3%.`, 'no', 'FAIL'); talk('induna', `REFUSED. It would have to rise about ${loss.toFixed(0)}% just to break even. Not again for an hour.`, 'no', 'NO', true); say('isihlangu', `${t.symbol} refused: selling straight back would cost ${loss.toFixed(1)}% (the limit is 3%).`, 'down'); state.cooldown[t.mint] = Date.now() + 3_600_000; return false; }
+    costPct = Math.max(0, loss); if (attempt === 1) talk('isihlangu', `Selling straight back would cost ${costPct.toFixed(2)}%. The limit is 3%.`, 'yes', 'PASS');
     got = q.quote.outAmount;
     if (!live()) { state.paperSol -= size.sol; break; }
     const before = await liveBalance(), res = await swap(q.quote, false); sig = res.signature;
     if (res.outcome === 'failed' && attempt < 2) { say('induna', `${t.symbol}: the buy failed on-chain (the price moved). Nothing was bought. Trying once more at a fresh price.`); continue; }
-    if (res.outcome !== 'confirmed') { say('induna', `${t.symbol}: the buy ${res.outcome === 'failed' ? 'failed on-chain twice; nothing was bought' : 'outcome is unknown; not retrying'}.`, 'down'); return false; }
+    if (res.outcome !== 'confirmed') { talk('induna', `The buy ${res.outcome === 'failed' ? 'failed on-chain twice. Nothing was bought' : 'outcome is unknown. Not retrying'}.`, 'no', 'NO', true); say('induna', `${t.symbol}: the buy ${res.outcome === 'failed' ? 'failed on-chain twice; nothing was bought' : 'outcome is unknown; not retrying'}.`, 'down'); return false; }
     const held = await tokenRaw(t.mint); if (held === 0n) { say('induna', `${t.symbol}: no coins arrived. Not retrying.`, 'down'); return false; }
     got = held.toString(); try { spent = Math.max(size.sol, before - await liveBalance()); } catch { /* keep the requested size */ }
     break;
@@ -65,6 +76,8 @@ export async function buy(t, rules) {
   const stop = entry * (1 - (a.stopPct ?? 10) / 100);
   state.positions.push({ mode: state.mode, mint: t.mint, symbol: t.symbol, pool: t.pool, solIn: spent, tokenRaw: got, entry, stop, baseStop: stop, target: entry * (1 + rules.settings.targetPct / 100), entryBar: a.at ?? Date.now(), openedAt: Date.now(), peak: entry, tf: a.tf === 1 ? 1 : 5, ...(a.style === 'dip' ? { dip: 1 } : {}), style: a.style ?? 'trend', auto: {}, sig, rules: rules.version, costPct });
   save(); emit('trade', { side: 'buy', symbol: t.symbol, sol: spent });
+  talk('induna', `BUY ${spent.toFixed(4)} SOL${live() ? '' : ' (practice)'}. ${rules.settings.stepPct ? `A third at +${rules.settings.stepPct}%, a third at +${rules.settings.stepPct * 2}%, the rest at +${rules.settings.targetPct}%` : `Sell at +${rules.settings.targetPct}%`}, stop −${(a.stopPct ?? 10).toFixed(0)}%, out after ${rules.settings.holdHours} hours.`, 'yes', 'BUY', true);
+  talk('umlobi', `Written down: entry $${entry.toPrecision(4)}, round-trip cost ${costPct.toFixed(2)}%, rules ${rules.version}.`);
   say('umkhonto', `BUY ${t.symbol}: ${spent.toFixed(4)} SOL${live() ? '' : ' (practice)'} · stop −${(a.stopPct ?? 10).toFixed(0)}% · target +${rules.settings.targetPct}% · cost ${costPct.toFixed(2)}% · ${a.dipNote ?? a.smartNote ?? 'signals agree'}.`, 'up');
   return true;
 }

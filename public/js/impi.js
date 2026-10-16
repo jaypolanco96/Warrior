@@ -18,6 +18,7 @@ export const AGENTS = [
   { id: 'umlobi', name: 'Umlobi', glyph: '✎', role: 'scribe', job: 'Writes down every decision and every result, costs included.' }
 ];
 export const rules = () => resolveRules({ preset: state.preset });
+const heard = {};
 let running = false, timer = 0, watcher = 0, last = null, nextAt = 0, rounds = 0, ms = 0;
 export const impi = { get running() { return running; }, get lastScan() { return last; }, get nextAt() { return nextAt; }, get rounds() { return rounds; }, get scanMs() { return ms; } };
 const say = (who, text, tone) => emit('say', { who, text, tone });
@@ -40,7 +41,15 @@ async function round() {
     const birds = read.filter((t) => (t.smart?.count ?? 0) > 0);
     if (birds.length) say('izinyoni', `Smart wallets buying: ${birds.map((t) => `${t.symbol} (${t.smart.count})`).join(', ')}.`);
     // 4. the spear
-    const owned = new Set(open.map((p) => p.mint)), picks = read.filter((t) => t.analysis?.decision === 'enter' && !owned.has(t.mint) && !((state.cooldown[t.mint] ?? 0) > Date.now()) && !(t.analysis.style === 'smart' && live()));
+    const owned = new Set(open.map((p) => p.mint));
+    for (const t of read.filter((x) => x.analysis?.decision === 'enter' && !owned.has(x.mint) && (state.cooldown[x.mint] ?? 0) > Date.now())) {
+      if ((heard[t.mint] ?? 0) > Date.now()) continue; heard[t.mint] = Date.now() + 15 * 60_000;
+      const until = new Date(state.cooldown[t.mint]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), lost = state.trades.findLast?.((x) => x.mint === t.mint && !x.partial);
+      emit('indaba-case', { symbol: t.symbol, facts: [t.analysis.dipNote ?? 'signals agree'] });
+      emit('indaba-line', { who: 'umkhonto', text: `${t.analysis.dipNote ?? 'The signals agree'}. The rule says strike.`, tone: 'yes', chip: 'STRIKE' });
+      emit('indaba-line', { who: 'induna', text: `${lost && lost.pnlSol < 0 ? 'Sold at a loss recently: the rule is 6 hours after a loss' : 'Bought or sold recently: the coin is resting'}. NOT NOW. Free again at ${until}.`, tone: 'wait', chip: 'WAIT', verdict: true });
+    }
+    const picks = read.filter((t) => t.analysis?.decision === 'enter' && !owned.has(t.mint) && !((state.cooldown[t.mint] ?? 0) > Date.now()) && !(t.analysis.style === 'smart' && live()));
     say('umkhonto', picks.length ? `Strike: ${picks.map((t) => `${t.symbol} (${t.analysis.dipNote ?? t.analysis.smartNote ?? 'signals agree'})`).join('; ')}.` : 'No coin is in the strike zone. Waiting is a position too.');
     // 5. the commander
     const bal = await balance(), equity = bal + heldSol(), start = rollDay(equity);

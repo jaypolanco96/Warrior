@@ -57,6 +57,12 @@
     <table class="book"><thead><tr><th>COIN</th><th>IN</th><th>NOW</th><th>P/L</th><th>STOP · PRICE · TARGET</th><th>HELD</th><th></th></tr></thead><tbody id="positions"></tbody></table>
     <div class="row"><button id="out" class="btn ghost" type="button">Get me out: sell everything</button><button id="csv" class="btn ghost" type="button">Download history (CSV)</button><button id="reset" class="btn ghost" type="button">Reset practice</button></div>
   </section>
+  <section class="card indaba" aria-labelledby="ind-h">
+    <h2 id="ind-h" class="label">THE INDABA · AGENTS DECIDE OUT LOUD</h2>
+    <div class="case" id="indaba-case"></div>
+    <ol id="indaba" class="stream" aria-live="polite"></ol>
+    <div class="foot small"><span id="indaba-tally">This session: nothing decided yet</span><span>Each line is a real check Warrior runs, with its real number</span></div>
+  </section>
   <section class="card log" aria-labelledby="log-h">
     <h2 id="log-h" class="label">LIVE FEED · WHAT EACH AGENT DID</h2>
     <ol id="log" class="term" aria-live="polite"></ol>
@@ -105,5 +111,6 @@
 <dialog id="pos-dlg" class="pos-dlg" aria-labelledby="pos-title"><div class="dlg"><div class="row pos-head"><h3 id="pos-title"></h3><button id="pos-close" class="btn ghost" type="button">Close</button></div><div id="pos-body"></div></div></dialog>
 
 <script type="module" src="/js/main.js"></script>
+<script type="module" src="/js/indaba.js"></script>
 </body>
 </html>

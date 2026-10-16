@@ -228,3 +228,28 @@ select{font:13px var(--sans);padding:6px 8px;border:1px solid var(--line);border
 @media (max-width:700px){.desk{grid-template-areas:"core" "pnl" "positions" "portfolio" "score" "agents" "wallet" "flow" "dist" "log"}}
 .score{grid-area:score}
 @media (min-width:1101px){.score{grid-area:auto}}
+
+/* the indaba */
+.indaba{grid-area:indaba}
+.indaba .case{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:12px var(--mono);color:var(--soft);margin-bottom:10px}
+.indaba .case b{font:800 16px var(--serif);color:var(--ink)}
+.indaba .stream{list-style:none;margin:0;padding:0 2px 0 0;display:flex;flex-direction:column;gap:8px;max-height:360px;min-height:120px;overflow:auto}
+.indaba .msg{display:grid;grid-template-columns:32px minmax(0,1fr);gap:8px;align-items:start}
+.indaba .av{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font:700 14px var(--sans);color:#fff}
+.indaba .av.c0{background:#e63946}.indaba .av.c1{background:#f77f00}.indaba .av.c2{background:#e0a300}.indaba .av.c3{background:#2a9d8f}.indaba .av.c4{background:#1d70e0}.indaba .av.c5{background:#7b2cbf}
+.indaba .who{font:700 11px var(--mono);letter-spacing:.08em}
+.indaba .who.c0{color:#e63946}.indaba .who.c1{color:#f77f00}.indaba .who.c2{color:#b88600}.indaba .who.c3{color:#2a9d8f}.indaba .who.c4{color:#1d70e0}.indaba .who.c5{color:#7b2cbf}
+:root[data-theme=dark] .indaba .who.c2{color:#fcbf49}:root[data-theme=dark] .indaba .who.c4{color:#5aa2ff}:root[data-theme=dark] .indaba .who.c5{color:#b57bff}
+.indaba .who .role{color:var(--soft);font-weight:400;margin-left:6px;letter-spacing:0}
+.indaba .bubble{border:1px solid var(--line);border-radius:4px 10px 10px 10px;padding:7px 10px;background:var(--paper);min-width:0}
+.indaba .txt{font-size:13px;overflow-wrap:anywhere}
+.indaba .chip{display:inline-block;font:700 10px var(--mono);padding:0 6px;border-radius:999px;margin-left:6px;border:1px solid currentColor}
+.indaba .chip.yes{color:var(--up)}.indaba .chip.no{color:var(--down)}.indaba .chip.wait{color:var(--soft)}
+.indaba .verdict .bubble{border-width:2px}
+.indaba .verdict.yes .bubble{border-color:var(--up)}.indaba .verdict.no .bubble{border-color:var(--down)}
+.indaba .cursor::after{content:"▍";animation:blink 1s steps(1) infinite;color:var(--soft)}
+.indaba .foot{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;margin-top:10px}
+@keyframes blink{50%{opacity:0}}
+@media (max-width:1100px){.desk{grid-template-areas:"core core" "agents pnl" "flow dist" "positions positions" "indaba indaba" "portfolio score" "wallet wallet" "log log"}}
+@media (max-width:700px){.desk{grid-template-areas:"core" "pnl" "positions" "indaba" "portfolio" "score" "agents" "wallet" "flow" "dist" "log"}}
+@media (min-width:1101px){.indaba{grid-area:auto}}
