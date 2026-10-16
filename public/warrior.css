@@ -352,4 +352,15 @@ select{font:13px var(--sans);padding:6px 8px;border:1px solid var(--line);border
 .rline.total{border-top:1px solid var(--line)}
 .rline.total.up .rsol{color:var(--up)}.rline.total.down .rsol{color:var(--down)}
 dialog .dlg{max-height:calc(100vh - 40px);overflow:auto}
-.care .fields,.care .fields.three{grid-template-columns:minmax(0,1fr)}.care input{min-width:0}.check input{width:20px;height:20px;flex:none}
+.care input{min-width:0}.check input{width:20px;height:20px;flex:none}
+
+/* care sits under the live feed: bedtime and sweep side by side, the three times in one row */
+.care-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 24px}
+.care-grid .care-block{border-top:0;padding:0}
+.care-grid .care-block + .care-block{border-left:1px dashed var(--line);padding-left:24px}
+.care .fields.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.care .fields{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+@media (max-width:900px){.care-grid{grid-template-columns:minmax(0,1fr)}.care-grid .care-block + .care-block{border-left:0;padding-left:0;border-top:1px dashed var(--line);padding-top:10px;margin-top:6px}}
+@media (max-width:520px){.care .fields.three,.care .fields{grid-template-columns:minmax(0,1fr)}}
+.care-grid{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}.care input[type=time]{padding:9px 6px;font-size:13px}@media (max-width:900px){.care-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:1100px) and (min-width:701px){.desk{grid-template-areas:"core core" "agents pnl" "flow dist" "positions positions" "indaba indaba" "adapt watchtower" "portfolio score" "log log" "care care" "wallet wallet"}}

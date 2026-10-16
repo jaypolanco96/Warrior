@@ -76,6 +76,30 @@
     <h2 id="log-h" class="label">LIVE FEED · WHAT EACH AGENT DID</h2>
     <ol id="log" class="term" aria-live="polite"></ol>
   </section>
+  <section class="card care" aria-labelledby="care-h">
+    <h2 id="care-h" class="label">CARE · BEDTIME AND SWEEP</h2>
+    <div class="care-grid">
+    <div class="care-block">
+      <label class="check"><input id="bed-on" type="checkbox" /> Bedtime rule: no new trades overnight</label>
+      <div class="fields three">
+        <div class="field"><label for="bed-stop">Stop opening at</label><input id="bed-stop" type="time" /></div>
+        <div class="field"><label for="bed-close">Close all at (optional)</label><input id="bed-close" type="time" /></div>
+        <div class="field"><label for="bed-wake">Start again at</label><input id="bed-wake" type="time" /></div>
+      </div>
+      <div class="row"><button id="bed-save" class="btn small" type="button">Save bedtime</button></div>
+      <p id="bed-text" class="small" role="status"></p>
+    </div>
+    <div class="care-block">
+      <label class="check"><input id="sweep-on" type="checkbox" /> Sweep profits out after live sales</label>
+      <div class="fields">
+        <div class="field"><label for="sweep-to">Send to (your Phantom address)</label><input id="sweep-to" type="text" autocomplete="off" spellcheck="false" /></div>
+        <div class="field"><label for="sweep-keep">Keep to trade with (SOL)</label><input id="sweep-keep" type="number" step="0.05" min="0.05" /></div>
+      </div>
+      <div class="row"><button id="sweep-save" class="btn small" type="button">Save sweep</button></div>
+      <p id="sweep-text" class="small" role="status"></p>
+    </div>
+    </div>
+  </section>
   </div>
   <div class="col col-right">
   <section class="card pnl" aria-labelledby="pnl-h">
@@ -97,28 +121,6 @@
     <table class="book"><thead><tr><th>STRENGTH</th><th>RESULT</th><th>TRADES</th><th>WIN</th><th>AVG SOL</th><th>LOSS RUN</th></tr></thead><tbody id="score"></tbody></table>
     <div class="row score-row"><label for="pause-after" class="small">Pause the impi after</label><select id="pause-after"><option value="0">never</option><option value="3">3 losses in a row</option><option value="4">4 losses in a row</option><option value="5">5 losses in a row</option></select><button id="score-reset" class="btn ghost small" type="button">Reset scorecard</button></div>
     <p id="score-note" class="small" role="status"></p>
-  </section>
-  <section class="card care" aria-labelledby="care-h">
-    <h2 id="care-h" class="label">CARE · BEDTIME AND SWEEP</h2>
-    <div class="care-block">
-      <label class="check"><input id="bed-on" type="checkbox" /> Bedtime rule: no new trades overnight</label>
-      <div class="fields three">
-        <div class="field"><label for="bed-stop">Stop opening at</label><input id="bed-stop" type="time" /></div>
-        <div class="field"><label for="bed-close">Close all at (optional)</label><input id="bed-close" type="time" /></div>
-        <div class="field"><label for="bed-wake">Start again at</label><input id="bed-wake" type="time" /></div>
-      </div>
-      <div class="row"><button id="bed-save" class="btn small" type="button">Save bedtime</button></div>
-      <p id="bed-text" class="small" role="status"></p>
-    </div>
-    <div class="care-block">
-      <label class="check"><input id="sweep-on" type="checkbox" /> Sweep profits out after live sales</label>
-      <div class="fields">
-        <div class="field"><label for="sweep-to">Send to (your Phantom address)</label><input id="sweep-to" type="text" autocomplete="off" spellcheck="false" /></div>
-        <div class="field"><label for="sweep-keep">Keep to trade with (SOL)</label><input id="sweep-keep" type="number" step="0.05" min="0.05" /></div>
-      </div>
-      <div class="row"><button id="sweep-save" class="btn small" type="button">Save sweep</button></div>
-      <p id="sweep-text" class="small" role="status"></p>
-    </div>
   </section>
   <section class="card wallet" aria-labelledby="w-h">
     <h2 id="w-h" class="label">TRADING WALLET</h2>
