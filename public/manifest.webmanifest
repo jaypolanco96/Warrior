@@ -1,13 +1,15 @@
 {
   "name": "Warrior",
   "short_name": "Warrior",
-  "description": "Solana meme coin trading with rules, plain words and practice money first. No profit is promised.",
+  "description": "Warrior: Solana meme and ecosystem coin trading with tested rules, a strict safety screen and practice money first. No profit is promised.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#07060d",
-  "theme_color": "#07060d",
+  "background_color": "#fff8ec",
+  "theme_color": "#fff8ec",
   "icons": [
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/favicon-32.png", "sizes": "32x32", "type": "image/png", "purpose": "any" },
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }

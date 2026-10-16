@@ -6,9 +6,13 @@ scripts/.vendor-entry.mjs
 .env
 .env.*
 !.env.example
-# The bot's wallet key, positions and logs never leave this machine.
+# The bot wallet key, positions and logs never leave this machine.
+.warrior/
 .laugh/
 .coin-toolchain/
+
+.vercel
+.env*
 
 .vercel
 .env*

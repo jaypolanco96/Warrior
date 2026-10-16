@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Warrior: a Zulu isihlangu shield in rainbow beadwork with an assegai spear">
+  <defs>
+    <linearGradient id="road" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#e63946"/><stop offset=".17" stop-color="#f77f00"/><stop offset=".34" stop-color="#fcbf49"/>
+      <stop offset=".5" stop-color="#2a9d8f"/><stop offset=".67" stop-color="#1d70e0"/><stop offset=".84" stop-color="#7b2cbf"/><stop offset="1" stop-color="#d81b60"/>
+    </linearGradient>
+    <clipPath id="shield"><ellipse cx="256" cy="262" rx="132" ry="214"/></clipPath>
+    <pattern id="beads" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M0 40 L20 0 L40 40 Z" fill="#ffffff" fill-opacity=".28"/>
+      <path d="M10 40 L20 20 L30 40 Z" fill="#1b1230" fill-opacity=".22"/>
+    </pattern>
+  </defs>
+  <!-- the assegai: a short stabbing spear, crossing behind the shield -->
+  <g transform="rotate(38 256 256)">
+    <rect x="248" y="40" width="16" height="440" rx="8" fill="#6b3f1d"/>
+    <path d="M256 4 L284 92 L256 120 L228 92 Z" fill="#c9ced6" stroke="#1b1230" stroke-width="8" stroke-linejoin="round"/>
+    <rect x="244" y="118" width="24" height="18" rx="4" fill="#fcbf49" stroke="#1b1230" stroke-width="5"/>
+  </g>
+  <!-- the isihlangu: tall cowhide war shield, here in rainbow beadwork bands -->
+  <g clip-path="url(#shield)">
+    <rect x="100" y="40" width="312" height="450" fill="url(#road)"/>
+    <rect x="100" y="40" width="312" height="450" fill="url(#beads)"/>
+    <!-- cowhide patches -->
+    <path d="M150 120 C190 100 220 140 200 175 C180 210 140 190 145 160 Z" fill="#ffffff" fill-opacity=".85"/>
+    <path d="M300 300 C350 285 375 330 350 360 C325 395 285 370 292 335 Z" fill="#ffffff" fill-opacity=".85"/>
+    <path d="M170 360 C200 350 215 380 200 400 C185 420 160 405 162 385 Z" fill="#1b1230" fill-opacity=".85"/>
+  </g>
+  <!-- the stick laced through the middle of the shield, with its slit lacing -->
+  <rect x="246" y="22" width="20" height="478" rx="10" fill="#6b3f1d" stroke="#1b1230" stroke-width="6"/>
+  <g fill="#fff8ec" stroke="#1b1230" stroke-width="4">
+    <rect x="232" y="110" width="48" height="16" rx="6"/><rect x="232" y="170" width="48" height="16" rx="6"/><rect x="232" y="230" width="48" height="16" rx="6"/>
+    <rect x="232" y="290" width="48" height="16" rx="6"/><rect x="232" y="350" width="48" height="16" rx="6"/><rect x="232" y="410" width="48" height="16" rx="6"/>
+  </g>
+  <ellipse cx="256" cy="262" rx="132" ry="214" fill="none" stroke="#1b1230" stroke-width="14"/>
+  <!-- the fur tuft at the top of the stick -->
+  <path d="M256 6 C232 18 236 38 256 34 C276 38 280 18 256 6 Z" fill="#1b1230"/>
+</svg>

@@ -1,6 +1,6 @@
 // The hourly monitor. Asks the live site whether it is up and whether each service it depends on is answering.
 // Exits with an error when something is wrong, which fails the workflow run and makes GitHub email the owner.
-const SITE = process.env.WARRIOR_SITE || 'https://WARRIOR_HOST';
+const SITE = process.env.WARRIOR_SITE || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'https://WARRIOR_HOST');
 const problems = [];
 try {
   const page = await fetch(SITE, { signal: AbortSignal.timeout(15000) }); if (!page.ok) problems.push(`The site answered ${page.status}.`);

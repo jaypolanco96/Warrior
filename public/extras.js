@@ -42,18 +42,18 @@ on('receipt', (trade) => { const nodes = receiptNodes(trade); if (trade.pnlSol >
 // ---------- Warrior cards: a picture of a win, with the honest numbers on it ----------
 function drawCard(canvas, trade) {
   const r = receipt(trade), g = canvas.getContext('2d'), W = canvas.width, H = canvas.height, practice = trade.mode === 'paper';
-  const bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, '#12092a'); bg.addColorStop(1, '#07060d'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
-  g.strokeStyle = '#ff3df2'; g.lineWidth = 6; g.strokeRect(24, 24, W - 48, H - 48);
+  const bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, '#fff8ec'); bg.addColorStop(1, '#fff8ec'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.strokeStyle = '#d81b60'; g.lineWidth = 6; g.strokeRect(24, 24, W - 48, H - 48);
   g.textAlign = 'center'; g.fillStyle = '#fff'; g.font = '220px system-ui, "Segoe UI Emoji", "Apple Color Emoji", sans-serif'; g.fillText('😂', W / 2, 300);
   g.font = '64px system-ui, "Segoe UI Emoji", sans-serif'; g.fillText('💖  💗  💕', W / 2, 400);
-  g.fillStyle = '#39ff88'; g.font = '900 120px system-ui, sans-serif'; g.fillText(`+${r.resultSol.toFixed(4)} SOL`, W / 2, 560);
-  g.fillStyle = '#f3f0ff'; g.font = '700 60px system-ui, sans-serif'; g.fillText(`+${r.resultPct}% on ${String(trade.symbol).slice(0, 12)}`, W / 2, 650);
-  g.fillStyle = practice ? '#27f5e6' : '#ffe94a'; g.font = '700 44px system-ui, sans-serif'; g.fillText(practice ? 'PRACTICE MONEY · nothing real was made' : 'REAL MONEY · after every fee', W / 2, 740);
-  g.fillStyle = '#a69fc2'; g.font = '36px system-ui, sans-serif';
+  g.fillStyle = '#1a9e4f'; g.font = '900 120px system-ui, sans-serif'; g.fillText(`+${r.resultSol.toFixed(4)} SOL`, W / 2, 560);
+  g.fillStyle = '#1b1230'; g.font = '700 60px system-ui, sans-serif'; g.fillText(`+${r.resultPct}% on ${String(trade.symbol).slice(0, 12)}`, W / 2, 650);
+  g.fillStyle = practice ? '#00897b' : '#f4a300'; g.font = '700 44px system-ui, sans-serif'; g.fillText(practice ? 'PRACTICE MONEY · nothing real was made' : 'REAL MONEY · after every fee', W / 2, 740);
+  g.fillStyle = '#6b5a7e'; g.font = '36px system-ui, sans-serif';
   g.fillText(`Costs paid: ${r.complete ? '' : 'at least '}${r.costsSol.toFixed(6)} SOL · closed by: ${trade.reason}`, W / 2, 820);
   g.fillText(`${new Date(trade.closedAt).toISOString().slice(0, 10)}${trade.rulesVersion ? ` · rules ${trade.rulesVersion}` : ''}`, W / 2, 872);
-  g.fillStyle = '#ffe94a'; g.font = '900 48px system-ui, sans-serif'; g.fillText('Warrior', W / 2, 960);
-  g.fillStyle = '#a69fc2'; g.font = '30px system-ui, sans-serif'; g.fillText('One trade, not a track record. No profit is ever promised.', W / 2, 1010);
+  g.fillStyle = '#f4a300'; g.font = '900 48px system-ui, sans-serif'; g.fillText('Warrior', W / 2, 960);
+  g.fillStyle = '#6b5a7e'; g.font = '30px system-ui, sans-serif'; g.fillText('One trade, not a track record. No profit is ever promised.', W / 2, 1010);
 }
 function openCard(trade) {
   if (!(trade.pnlSol > 0)) return; const canvas = el('canvas', 'warrior-card'); canvas.width = 1080; canvas.height = 1080; canvas.setAttribute('role', 'img');
