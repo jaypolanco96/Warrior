@@ -136,9 +136,11 @@ export function drawPortfolio() {
   const prices = Object.fromEntries(state.positions.filter((p) => Number.isFinite(p.last)).map((p) => [p.mint, p.last]));
   const s = summarize({ positions: state.positions, trades: state.trades, prices, mode: state.mode });
   const kv = (k, v, cls = '') => { const d = el('div'); d.append(el('span', '', k), el('b', cls, v)); return d; }, sol = (n) => `${n >= 0 ? '+' : ''}${n.toFixed(4)}`;
+  // what trading itself cost: the round trip measured at each buy (price impact plus pool fees), on what went in
+  const priced = state.trades.filter((t) => t.mode === state.mode && Number.isFinite(t.costPct)), costs = priced.filter((t) => !t.partial).map((t) => t.costPct), paid = priced.reduce((n, t) => n + t.solIn * t.costPct / 100, 0);
   const grid = el('div', 'pf-grid');
   grid.append(kv('IN COINS', `${s.valueSol.toFixed(4)} SOL`), kv('COST', `${s.costSol.toFixed(4)} SOL`), kv('UNREALIZED', sol(s.unrealizedSol), s.unrealizedSol >= 0 ? 'up' : 'down'), kv('REALIZED', sol(s.realizedSol), s.realizedSol >= 0 ? 'up' : 'down'),
-    kv('WINS / LOSSES', `${s.wins} / ${s.losses}`), kv('BEST', s.best ? `${s.best.symbol} ${sol(s.best.pnlSol)}` : '—', 'up'), kv('WORST', s.worst ? `${s.worst.symbol} ${sol(s.worst.pnlSol)}` : '—', 'down'), kv('ORDERS', String(waiting().filter((o) => o.mode === state.mode).length)));
+    kv('WINS / LOSSES', `${s.wins} / ${s.losses}`), kv('BEST', s.best ? `${s.best.symbol} ${sol(s.best.pnlSol)}` : '—', 'up'), kv('WORST', s.worst ? `${s.worst.symbol} ${sol(s.worst.pnlSol)}` : '—', 'down'), kv('ORDERS', String(waiting().filter((o) => o.mode === state.mode).length)), kv('AVG COST / TRADE', costs.length ? `${(costs.reduce((a, b) => a + b, 0) / costs.length).toFixed(2)}%` : '—'), kv('COST PAID', `${paid.toFixed(4)} SOL`));
   const bar = el('div', 'pf-bar'); const total = s.valueSol || 1;
   s.holdings.forEach((h, i) => { const seg = el('span', `seg c${i % 6} w${Math.max(1, Math.min(20, Math.round(h.valueSol / total * 20)))}`); seg.title = `${h.symbol}: ${h.valueSol.toFixed(4)} SOL`; bar.append(seg); });
   const list = el('ul', 'pf-list'); for (const [i, h] of s.holdings.entries()) { const li = el('li'), dot = el('i', `c${i % 6}`); li.append(dot, el('span', '', h.symbol), el('span', '', `${h.valueSol.toFixed(4)} SOL`), el('span', h.pnlPct === null ? '' : h.pnlPct >= 0 ? 'up' : 'down', h.pnlPct === null ? 'no price yet' : pct(h.pnlPct))); list.append(li); }

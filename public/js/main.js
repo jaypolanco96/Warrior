@@ -121,7 +121,7 @@ $('out').addEventListener('click', async () => {
 });
 // The full history as a spreadsheet file: every sale, its costs already inside the result, practice and live marked.
 $('csv').addEventListener('click', () => {
-  const rows = [['closed_at_utc', 'mode', 'coin', 'kind', 'sol_in', 'sol_out', 'result_sol', 'result_pct', 'why_closed', 'part_sale', 'opened_at_utc', 'minutes_held', 'rules_version', 'coin_address'], ...state.trades.map((t) => [new Date(t.closedAt).toISOString(), t.mode === 'live' ? 'live' : 'practice', t.symbol, t.style ?? '', t.solIn.toFixed(6), t.solOut.toFixed(6), t.pnlSol.toFixed(6), t.pnlPct.toFixed(2), t.reason, t.partial ? 'yes' : 'no', t.openedAt ? new Date(t.openedAt).toISOString() : '', t.openedAt ? ((t.closedAt - t.openedAt) / 60000).toFixed(1) : '', t.rules ?? '', t.mint])];
+  const rows = [['closed_at_utc', 'mode', 'coin', 'kind', 'sol_in', 'sol_out', 'result_sol', 'result_pct', 'why_closed', 'part_sale', 'opened_at_utc', 'minutes_held', 'rules_version', 'round_trip_cost_pct', 'coin_address'], ...state.trades.map((t) => [new Date(t.closedAt).toISOString(), t.mode === 'live' ? 'live' : 'practice', t.symbol, t.style ?? '', t.solIn.toFixed(6), t.solOut.toFixed(6), t.pnlSol.toFixed(6), t.pnlPct.toFixed(2), t.reason, t.partial ? 'yes' : 'no', t.openedAt ? new Date(t.openedAt).toISOString() : '', t.openedAt ? ((t.closedAt - t.openedAt) / 60000).toFixed(1) : '', t.rules ?? '', Number.isFinite(t.costPct) ? t.costPct.toFixed(2) : '', t.mint])];
   const csv = rows.map((r) => r.map((v) => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v)).join(',')).join('\n'), a = el('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `warrior-trades-${new Date().toISOString().slice(0, 10)}.csv`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 });
@@ -173,6 +173,21 @@ function syncLine() { const p = el('p', 'small sync-line', sync.note); p.id = 's
 // Another device's copy arrived: take it in and redraw everything.
 on('synced', () => { reload(); drawControls(); void drawMoney(); drawOrders(); drawPortfolio(); });
 on('vault-open', () => void syncNow());
+
+// ---------- scorecard ----------
+import { PRESETS, score, resetBooks } from './shadow.js';
+function drawScore() {
+  const rows = PRESETS.map((k) => [k, score(k)]), ready = rows.filter(([, s]) => s.trades >= 10), best = ready.length ? ready.reduce((a, b) => (b[1].changePct > a[1].changePct ? b : a))[0] : null;
+  $('score').replaceChildren(...rows.map(([k, s]) => { const tr = el('tr', k === best ? 'lead' : ''), name = el('td', '', `${k.toUpperCase()}${k === state.preset ? ' · ON' : ''}`);
+    tr.append(name, el('td', s.changePct >= 0 ? 'up' : 'down', `${s.equity.toFixed(3)} (${pct(s.changePct)})`), el('td', '', `${s.trades}${s.open ? ` +${s.open}` : ''}`), el('td', '', s.winPct === null ? '—' : `${Math.round(s.winPct)}%`), el('td', s.avgSol === null ? '' : s.avgSol >= 0 ? 'up' : 'down', s.avgSol === null ? '—' : `${s.avgSol >= 0 ? '+' : ''}${s.avgSol.toFixed(4)}`), el('td', '', String(s.worstStreak))); return tr; }));
+  const since = Math.round((Date.now() - score('balanced').since) / 3_600_000);
+  $('score-note').textContent = best ? `${best.toUpperCase()} leads after ${since}h. Past results, on estimates: they do not promise the next week.` : `Comparing needs 10 trades per strength; ${since}h so far. Keep the impi out to fill it in.`;
+  $('pause-after').value = String(state.pauseAfter ?? 4);
+}
+$('pause-after').addEventListener('change', () => { state.pauseAfter = Number($('pause-after').value); save(); emit('say', { who: 'induna', text: state.pauseAfter ? `The impi will pause after ${state.pauseAfter} losing trades in a row.` : 'The impi will not pause for a losing streak (the daily loss limit still applies).' }); });
+let scoreArmed = 0;
+$('score-reset').addEventListener('click', () => { if (Date.now() - scoreArmed > 5000) { scoreArmed = Date.now(); $('score-reset').textContent = 'Tap again to reset'; setTimeout(() => { $('score-reset').textContent = 'Reset scorecard'; }, 5000); return; } resetBooks(); $('score-reset').textContent = 'Reset scorecard'; });
+on('shadow', drawScore); on('synced', drawScore); drawScore();
 
 // ---------- dark mode ----------
 function drawTheme() { const d = document.documentElement.dataset.theme === 'dark'; $('theme').setAttribute('aria-pressed', String(d)); $('theme').querySelector('.tt-l').textContent = d ? 'DARK' : 'LIGHT'; document.querySelector('meta[name=theme-color]').content = d ? '#120d1a' : '#fff8ec'; }

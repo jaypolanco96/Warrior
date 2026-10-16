@@ -41,13 +41,15 @@ export async function buy(t, rules) {
   if (!safety.safe) { say('isihlangu', `${t.symbol} refused: ${safety.reason}.`, 'down'); state.cooldown[t.mint] = Date.now() + 6 * 3_600_000; return false; }
   let launch; try { launch = await api(`/api/coin?what=audit&mint=${t.mint}&level=${state.preset}`); } catch { say('isihlangu', `${t.symbol}: its launch record could not be read, so no buy. Unknown is not safe.`); return false; }
   if (!launch.ok) { say('isihlangu', `${t.symbol} refused: ${launch.reasons.join('. ')}.`, 'down'); state.cooldown[t.mint] = Date.now() + 24 * 3_600_000; return false; }
-  const lamports = Math.round(size.sol * 1e9); let q, got, spent = size.sol, sig = 'practice';
+  const lamports = Math.round(size.sol * 1e9); let q, got, spent = size.sol, sig = 'practice', costPct = null;
   // If the buy fails on-chain (the price moved past the slippage limit), nothing was bought: it is tried once more at a fresh price.
   for (let attempt = 1; ; attempt++) {
     q = await api(`/api/quote?${new URLSearchParams({ inputMint: SOL, outputMint: t.mint, amount: String(lamports), slip: String(r.slippageBps) })}`);
     if (!q.check.ok) { say('induna', `${t.symbol}: ${q.check.reasons.join('; ')}. Waiting.`); return false; }
     const back = await api(`/api/quote?${new URLSearchParams({ inputMint: t.mint, outputMint: SOL, amount: q.quote.outAmount, exit: '1' })}`), loss = (1 - Number(back.quote.outAmount) / lamports) * 100;
-    if (!(loss <= 6)) { say('isihlangu', `${t.symbol} refused: selling straight back would lose ${loss.toFixed(1)}%.`, 'down'); state.cooldown[t.mint] = Date.now() + 3_600_000; return false; }
+    // Selling straight back must cost 3% or less. Most watched coins cost under 1%; a coin costing more has to rise a long way just to break even.
+    if (!(loss <= 3)) { say('isihlangu', `${t.symbol} refused: selling straight back would cost ${loss.toFixed(1)}% (the limit is 3%).`, 'down'); state.cooldown[t.mint] = Date.now() + 3_600_000; return false; }
+    costPct = Math.max(0, loss);
     got = q.quote.outAmount;
     if (!live()) { state.paperSol -= size.sol; break; }
     const before = await liveBalance(), res = await swap(q.quote, false); sig = res.signature;
@@ -59,9 +61,9 @@ export async function buy(t, rules) {
   }
   const price = Number(q.quote.swapUsdValue) / (Number(got) / 10 ** safety.decimals), entry = Number.isFinite(price) && price > 0 ? price : a.price;
   const stop = entry * (1 - (a.stopPct ?? 10) / 100);
-  state.positions.push({ mode: state.mode, mint: t.mint, symbol: t.symbol, pool: t.pool, solIn: spent, tokenRaw: got, entry, stop, baseStop: stop, target: entry * (1 + rules.settings.targetPct / 100), entryBar: a.at ?? Date.now(), openedAt: Date.now(), peak: entry, tf: a.tf === 1 ? 1 : 5, ...(a.style === 'dip' ? { dip: 1 } : {}), style: a.style ?? 'trend', auto: {}, sig, rules: rules.version });
+  state.positions.push({ mode: state.mode, mint: t.mint, symbol: t.symbol, pool: t.pool, solIn: spent, tokenRaw: got, entry, stop, baseStop: stop, target: entry * (1 + rules.settings.targetPct / 100), entryBar: a.at ?? Date.now(), openedAt: Date.now(), peak: entry, tf: a.tf === 1 ? 1 : 5, ...(a.style === 'dip' ? { dip: 1 } : {}), style: a.style ?? 'trend', auto: {}, sig, rules: rules.version, costPct });
   save(); emit('trade', { side: 'buy', symbol: t.symbol, sol: spent });
-  say('umkhonto', `BUY ${t.symbol}: ${spent.toFixed(4)} SOL${live() ? '' : ' (practice)'} · stop −${(a.stopPct ?? 10).toFixed(0)}% · target +${rules.settings.targetPct}% · ${a.dipNote ?? a.smartNote ?? 'signals agree'}.`, 'up');
+  say('umkhonto', `BUY ${t.symbol}: ${spent.toFixed(4)} SOL${live() ? '' : ' (practice)'} · stop −${(a.stopPct ?? 10).toFixed(0)}% · target +${rules.settings.targetPct}% · cost ${costPct.toFixed(2)}% · ${a.dipNote ?? a.smartNote ?? 'signals agree'}.`, 'up');
   return true;
 }
 
@@ -79,7 +81,7 @@ export async function sell(p, reason, fraction = 1) {
     if (whole) { rent = await reclaim(p.mint); out += rent; } }
   else state.paperSol += out;
   const cost = whole ? p.solIn : p.solIn * fraction, pnl = out - cost;
-  state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, solIn: cost, solOut: out, pnlSol: pnl, pnlPct: pnl / cost * 100, reason, style: p.style, partial: !whole, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules });
+  state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, solIn: cost, solOut: out, pnlSol: pnl, pnlPct: pnl / cost * 100, reason, style: p.style, partial: !whole, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules, costPct: p.costPct ?? null });
   if (whole) { state.positions = state.positions.filter((x) => x !== p); state.cooldown[p.mint] = Math.max(Date.now() + (pnl < 0 ? 120 : 30) * 60_000, p.dip === 1 ? p.openedAt + 6 * 3_600_000 : 0); }
   else { p.solIn -= cost; p.tokenRaw = (held - raw).toString(); delete p.nowSol; } // the old value was for the whole position
   save(); emit('trade', { side: 'sell', symbol: p.symbol, pnl });

@@ -7,6 +7,7 @@ import { claimTrading, releaseTrading, holdWhile } from './sync.js';
 import { buy, watch, balance, heldSol, live } from './trader.js';
 import { vault } from './wallet.js';
 import { fire } from './net.js';
+import { shadowRound } from './shadow.js';
 
 export const AGENTS = [
   { id: 'inhloli', name: 'Inhloli', glyph: '👁', role: 'scout', job: 'Watches Solana meme and ecosystem coins; keeps only the busy ones.' },
@@ -52,6 +53,8 @@ async function round() {
     say('umlobi', `Equity ${eq.toFixed(4)} SOL${live() ? '' : ' (practice)'}.`);
   } catch (e) { say('inhloli', `This round could not run (${e.message}). Trying again in a minute; nothing was traded.`, 'down'); }
   finally { lock.busy = false; }
+  // the scorecard: all three strengths, side by side, on pretend money (it never trades)
+  if (running) void shadowRound({ [state.preset]: last }).catch(() => {});
 }
 async function guard() { if (lock.busy) return; lock.busy = true; try { await watch(rules()); emit('positions'); } catch { /* next time */ } finally { lock.busy = false; } }
 
@@ -61,9 +64,15 @@ export async function start() {
   if (running) return null;
   if (live()) { if (!vault.exists) return 'Make the trading wallet first.'; if (!vault.unlocked) return 'Unlock the trading wallet first.'; if (!state.backedUp) return 'Save the backup key first.'; }
   const held = await claimTrading(); if (held) return held; // one device trades at a time
-  running = true; say('induna', `The impi is out: ${state.preset}, ${live() ? 'LIVE with real SOL' : 'practice money'}.`); void round();
+  running = true; state.streakFrom = Date.now(); save(); say('induna', `The impi is out: ${state.preset}, ${live() ? 'LIVE with real SOL' : 'practice money'}.`); void round();
   timer = setInterval(round, 60_000); watcher = setInterval(guard, 30_000); emit('running'); return null;
 }
+// Pause after a losing streak: the chosen number of whole trades in a row lost since the impi was last sent out.
+export function losingStreak() { let n = 0; for (const t of state.trades) { if (t.mode !== state.mode || t.partial || t.closedAt < (state.streakFrom ?? 0)) continue; n = t.pnlSol < 0 ? n + 1 : 0; } return n; }
+on('trade', ({ side } = {}) => {
+  const limit = state.pauseAfter ?? 4; if (!running || side !== 'sell' || !limit) return;
+  const n = losingStreak(); if (n >= limit) { say('induna', `${n} losing trades in a row: the impi is pausing, as you asked. Open positions keep their stops. Look at the scorecard, then send it out again when you are ready.`, 'down'); stop(); }
+});
 export function stop() { running = false; nextAt = 0; clearInterval(timer); clearInterval(watcher); void releaseTrading(); say('induna', 'The impi is resting. Open positions are still yours; start again to keep watching them.'); emit('running'); }
 /** A look without trading, so the dashboard is alive before the impi is sent. */
 export async function peek() { try { const t0 = performance.now(), scan = await api(`/api/scan?${toQuery({ preset: state.preset })}`); ms = performance.now() - t0; last = scan; emit('scan', scan); } catch { /* shown next time */ } }
