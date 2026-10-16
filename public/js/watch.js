@@ -18,11 +18,11 @@ const fresh = (list, mint, within) => list.some((x) => x.mint === mint && Date.n
 on('missed', ({ mint, symbol, price, rule, gap }) => {
   const w = book(); if (!Number.isFinite(price) || price <= 0 || fresh(w.missed, mint, FOLLOW)) return;
   const s = resolveRules({ preset: state.preset }).settings;
-  w.missed.push({ mint, symbol, rule, gap: Number.isFinite(gap) ? gap : null, preset: state.preset, p0: price, at: Date.now(), max: price, min: price, last: price, stop: s.dipStopPct, target: s.targetPct, hit: null, done: false }); trim(w.missed); save();
+  w.missed.push({ mint, symbol, rule, gap: Number.isFinite(gap) ? gap : null, preset: state.preset, mode: state.mode, p0: price, at: Date.now(), max: price, min: price, last: price, stop: s.dipStopPct, target: s.targetPct, hit: null, done: false }); trim(w.missed); save();
 });
 on('trade', ({ side, mint, symbol, px, reason, whole } = {}) => {
   if (side !== 'sell' || !whole || !Number.isFinite(px) || px <= 0) return;
-  const w = book(); w.after.push({ mint, symbol, reason, preset: state.preset, p0: px, at: Date.now(), max: px, min: px, last: px, done: false }); trim(w.after); save();
+  const w = book(); w.after.push({ mint, symbol, reason, preset: state.preset, mode: state.mode, p0: px, at: Date.now(), max: px, min: px, last: px, done: false }); trim(w.after); save();
 });
 on('dip-seen', ({ mint, symbol, price }) => {
   const w = book(); if (fresh(w.dips, mint, DIP_WINDOW)) return;
@@ -60,12 +60,13 @@ export function weather() {
 export function weatherFactor() { if (book().guard !== 'auto') return 1; const { level } = weather(); return level === 'severe' ? 0 : level === 'storm' ? 0.5 : 1; }
 
 // ---------- summaries (also used by the self-ruling engine) ----------
+// Practice never teaches live, and the other way round: each summary reads only the current mode.
 export function missedByRule(preset = state.preset) {
-  const out = {}; for (const x of book().missed) { if (!x.done || x.preset !== preset) continue; (out[x.rule] ??= []).push(x); }
+  const out = {}; for (const x of book().missed) { if (!x.done || x.preset !== preset || (x.mode ?? 'paper') !== state.mode) continue; (out[x.rule] ??= []).push(x); }
   return Object.fromEntries(Object.entries(out).map(([k, l]) => [k, { n: l.length, avg: l.reduce((a, b) => a + b.result, 0) / l.length, list: l }]));
 }
 export function afterByReason(preset = state.preset) {
-  const out = {}; for (const x of book().after) { if (!x.done || x.preset !== preset) continue; (out[x.reason] ??= []).push(x); }
+  const out = {}; for (const x of book().after) { if (!x.done || x.preset !== preset || (x.mode ?? 'paper') !== state.mode) continue; (out[x.reason] ??= []).push(x); }
   return Object.fromEntries(Object.entries(out).map(([k, l]) => [k, { n: l.length, max: l.reduce((a, b) => a + b.afterMax, 0) / l.length, end: l.reduce((a, b) => a + b.afterEnd, 0) / l.length }]));
 }
 

@@ -179,7 +179,7 @@ import { PRESETS, score, resetBooks } from './shadow.js';
 function drawScore() {
   const rows = PRESETS.map((k) => [k, score(k)]), ready = rows.filter(([, s]) => s.trades >= 10), best = ready.length ? ready.reduce((a, b) => (b[1].changePct > a[1].changePct ? b : a))[0] : null;
   $('score').replaceChildren(...rows.map(([k, s]) => { const tr = el('tr', k === best ? 'lead' : ''), name = el('td', '', `${k.toUpperCase()}${k === state.preset ? ' · ON' : ''}`);
-    tr.append(name, el('td', s.changePct >= 0 ? 'up' : 'down', `${s.equity.toFixed(3)} (${pct(s.changePct)})`), el('td', '', `${s.trades}${s.open ? ` +${s.open}` : ''}`), el('td', '', s.winPct === null ? '—' : `${Math.round(s.winPct)}%`), el('td', s.avgSol === null ? '' : s.avgSol >= 0 ? 'up' : 'down', s.avgSol === null ? '—' : `${s.avgSol >= 0 ? '+' : ''}${s.avgSol.toFixed(4)}`), el('td', '', String(s.worstStreak))); return tr; }));
+    tr.append(name, el('td', s.changePct >= 0 ? 'up' : 'down', pct(s.changePct)), el('td', '', `${s.trades}${s.open ? ` +${s.open}` : ''}`), el('td', '', s.winPct === null ? '—' : `${Math.round(s.winPct)}%`), el('td', s.avgSol === null ? '' : s.avgSol >= 0 ? 'up' : 'down', s.avgSol === null ? '—' : `${s.avgSol >= 0 ? '+' : ''}${s.avgSol.toFixed(4)}`), el('td', '', String(s.worstStreak))); return tr; }));
   const since = Math.round((Date.now() - score('balanced').since) / 3_600_000);
   $('score-note').textContent = best ? `${best.toUpperCase()} leads after ${since}h. Past results, on estimates: they do not promise the next week.` : `Comparing needs 10 trades per strength; ${since}h so far. Keep the impi out to fill it in.`;
   $('pause-after').value = String(state.pauseAfter ?? 4);

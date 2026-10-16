@@ -278,3 +278,8 @@ select{font:13px var(--sans);padding:6px 8px;border:1px solid var(--line);border
 .watchtower .book td:first-child{white-space:normal}
 .adapt .book td,.adapt .book th,.watchtower .book td,.watchtower .book th{white-space:normal;padding:4px 4px}
 .adapt .book{font-size:11px}
+
+/* scorecard fits its column */
+.score .book{font-size:11px}
+.score .book th,.score .book td{padding:4px 3px;white-space:normal}
+.score .book td:nth-child(2){white-space:nowrap}
