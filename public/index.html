@@ -77,7 +77,7 @@
     <ol id="log" class="term" aria-live="polite"></ol>
   </section>
   <section class="card care" aria-labelledby="care-h">
-    <h2 id="care-h" class="label">CARE · BEDTIME AND SWEEP</h2>
+    <h2 id="care-h" class="label">CARE · BEDTIME, SWEEP AND ALERTS</h2>
     <div class="care-grid">
     <div class="care-block">
       <label class="check"><input id="bed-on" type="checkbox" /> Bedtime rule: no new trades overnight</label>
@@ -100,7 +100,8 @@
     </div>
     </div>
     <div class="care-block care-wide">
-      <div class="row"><button id="alerts-toggle" class="btn ghost small" type="button" aria-pressed="false">Alerts off</button><span id="alerts-note" class="small" role="status"></span></div>
+      <div class="row"><button id="alerts-toggle" class="btn ghost small" type="button" aria-pressed="false">Alerts off</button><button id="drum-toggle" class="btn ghost small" type="button" aria-pressed="true">War drum on</button><span class="small">Hear it:</span><button id="drum-buy" class="btn ghost small" type="button">Buy</button><button id="drum-win" class="btn ghost small" type="button">Win</button><button id="drum-loss" class="btn ghost small" type="button">Loss</button><button id="drum-alert" class="btn ghost small" type="button">Alert</button></div>
+      <p id="alerts-note" class="small" role="status"></p>
     </div>
   </section>
   </div>

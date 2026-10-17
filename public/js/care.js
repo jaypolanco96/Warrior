@@ -2,6 +2,10 @@
 // problem, so you hear about it with the tab in the background. Phones only show notifications through an installed
 // helper, so the offline helper (sw.js) is registered here too; it never stores anything from /api.
 import { state, save, on, emit } from './store.js';
+import { drum } from './drum.js';
+// The war drum plays for every buy, sale, pause and problem, in front or in the background (on unless you switch it off).
+const sound = () => state.drum !== false;
+const beat = (kind) => { if (sound()) drum(kind); };
 
 const $ = (id) => document.getElementById(id);
 const supported = () => typeof Notification !== 'undefined';
@@ -28,9 +32,15 @@ $('alerts-toggle')?.addEventListener('click', async () => {
   if (state.alerts) emit('say', { who: 'umlobi', text: 'Alerts are on: you will get a notification for trades, pauses and problems while Warrior is in the background.' });
 });
 on('trade', ({ side, symbol, sol, pnl, reason } = {}) => {
+  if (side === 'buy') beat('buy'); else if (side === 'sell' && Number.isFinite(pnl)) beat(pnl >= 0 ? 'win' : 'loss');
   if (side === 'buy') systemNote(`Warrior bought ${symbol}`, `${Number(sol).toFixed(4)} SOL${state.mode === 'live' ? '' : ' (practice)'}`);
   else if (side === 'sell' && Number.isFinite(pnl)) systemNote(`Warrior sold ${symbol}: ${pnl >= 0 ? '+' : '−'}${Math.abs(pnl).toFixed(4)} SOL`, `${reason ?? ''}${state.mode === 'live' ? '' : ' (practice)'}`);
 });
-on('alert', ({ title, body } = {}) => systemNote(title, body));
+on('alert', ({ title, body } = {}) => { beat('alert'); systemNote(title, body); });
+// the drum's switch and a test button, beside Alerts
+function drawDrum() { const b = $('drum-toggle'); if (!b) return; b.textContent = sound() ? 'War drum on' : 'War drum off'; b.setAttribute('aria-pressed', String(sound())); }
+$('drum-toggle')?.addEventListener('click', () => { state.drum = !sound(); save(); drawDrum(); if (sound()) drum('buy'); });
+for (const k of ['buy', 'win', 'loss', 'alert']) $(`drum-${k}`)?.addEventListener('click', () => { if (!drum(k)) $('alerts-note').textContent = 'Tap anywhere on the page once so the browser allows sound, then try again.'; });
+on('synced', drawDrum); drawDrum();
 on('synced', draw);
 draw();

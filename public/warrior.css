@@ -373,3 +373,5 @@ dialog .dlg{max-height:calc(100vh - 40px);overflow:auto}
 .card.folded > .label{margin-bottom:0}
 .care-wide{grid-column:1/-1;border-top:1px dashed var(--line);padding-top:10px;margin-top:6px}
 #alerts-toggle[aria-pressed=true]{border-color:var(--up);color:var(--up)}
+#drum-toggle[aria-pressed=true]{border-color:var(--r2);color:var(--r2)}
+@media (max-width:1400px){.care-grid{grid-template-columns:minmax(0,1fr)}.care-grid .care-block + .care-block{border-left:0;padding-left:0;border-top:1px dashed var(--line);padding-top:10px;margin-top:6px}}
