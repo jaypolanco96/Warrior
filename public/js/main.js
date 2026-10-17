@@ -4,7 +4,7 @@ import { sync, syncNow } from './sync.js';
 import { drawOrders, drawPortfolio } from './tools.js';
 import { vault, owner, connectPhantom, disconnectPhantom, reconnectPhantom, fundFromPhantom, withdraw, liveBalance } from './wallet.js';
 import { AGENTS, impi, start, stop, peek, rules } from './impi.js';
-import { sell, sellAll, balance, heldSol, writeOff } from './trader.js';
+import { sell, sellAll, balance, heldSol, writeOff, swapped } from './trader.js';
 import { receipt } from '/vendor/lib/receipt.js';
 import { validateBedtime, bedtimeText } from '/vendor/lib/mood.js';
 import { startNet, setData } from './net.js';
@@ -85,7 +85,7 @@ async function drawMoney() {
   $('s-best').textContent = pcts.length ? pct(Math.max(...pcts)) : '—'; $('s-worst').textContent = pcts.length ? pct(Math.min(...pcts)) : '—';
   $('s-pf').textContent = losses > 0 ? (gains / losses).toFixed(2) : gains > 0 ? '∞' : '—'; $('s-hold').textContent = held.length ? `${Math.round(held.reduce((a, b) => a + b, 0) / held.length)}m` : '—';
   $('s-best').className = 'up'; $('s-worst').className = 'down';
-  $('positions').replaceChildren(...(open.length ? open.map((p) => { const tr = el('tr'), now = Number.isFinite(p.nowSol) ? p.nowSol : p.solIn, g = (now / p.solIn - 1) * 100, b = el('button', 'sell', 'Sell'); b.type = 'button';
+  $('positions').replaceChildren(...(open.length ? open.map((p) => { const tr = el('tr'), now = Number.isFinite(p.nowSol) ? p.nowSol + (p.rentSol ?? 0) : p.solIn, g = (Number.isFinite(p.nowSol) ? p.nowSol / swapped(p) - 1 : 0) * 100, b = el('button', 'sell', 'Sell'); b.type = 'button';
     b.addEventListener('click', async () => { b.disabled = true; try { await exclusive(() => sell(p, 'manual')); } catch (e) { emit('say', { who: 'induna', text: `${p.symbol}: ${e.message}`, tone: 'down' }); } void drawMoney(); });
     const name = el('a', '', `${p.symbol}${p.dip ? ' · dip' : ''}`); name.href = `https://dexscreener.com/solana/${p.mint}`; name.target = '_blank'; name.rel = 'noopener';
     const px = p.last ?? p.entry, toStop = (p.stop / px - 1) * 100, toTgt = (p.target / px - 1) * 100, span = el('td', 'range'), bar = el('span', 'rbar'), mark = el('i'), at = Math.max(0, Math.min(1, (px - p.stop) / ((p.target - p.stop) || 1)));

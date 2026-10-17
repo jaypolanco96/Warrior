@@ -2,7 +2,7 @@
 // stop and target, sell-above orders and take-profit steps. Plus the order engine that runs them and the portfolio.
 // Orders live in the synced state, so every device you open Warrior on sees them; only the device that is open runs them.
 import { state, save, emit, on, exclusive, lock } from './store.js';
-import { sell, addFunds, liveStops } from './trader.js';
+import { sell, addFunds, liveStops, swapped } from './trader.js';
 import { impi, rules } from './impi.js';
 import { validateOrder, orderDue, validateExits, ORDER_LIMITS } from '/vendor/lib/orders.js';
 import { summarize } from '/vendor/lib/portfolio.js';
@@ -40,8 +40,8 @@ export function openPosition(start) {
   row.append(button('Take out what I put in', 'ghost', () => run(sP, async () => {
     const p = find(mint, mode); if (!p) throw new Error('that position is no longer open');
     if (!Number.isFinite(p.nowSol)) throw new Error('no fresh sale price yet; try again in half a minute');
-    if (p.nowSol <= p.solIn * 1.03) throw new Error(`only possible once it is worth more than the ${p.solIn.toFixed(4)} SOL you put in (a sale now returns about ${p.nowSol.toFixed(4)} SOL)`);
-    const fraction = Math.min(1, p.solIn / p.nowSol * 1.01); await sell(p, 'took-out', fraction); return fraction;
+    if (p.nowSol <= swapped(p) * 1.03) throw new Error(`only possible once it is worth more than the ${swapped(p).toFixed(4)} SOL you swapped in (a sale now returns about ${p.nowSol.toFixed(4)} SOL)`);
+    const fraction = Math.min(1, swapped(p) / p.nowSol * 1.01); await sell(p, 'took-out', fraction); return fraction;
   }, (f) => `Sold ${Math.round(f * 100)}%: about what you put in is back in the wallet. The rest rides, and it can still fall to nothing.`)));
   part.append(row, sP);
 

@@ -21,9 +21,15 @@ const b64 = (bytes) => btoa(Array.from(bytes, (b) => String.fromCharCode(b)).joi
 const mine = () => state.positions.filter((p) => p.mode === state.mode);
 // Positions that can still be sold. One whose pool was emptied is worth nothing: it uses no slot and adds nothing to equity.
 export const sellable = () => mine().filter((p) => !p.empty);
+// A new coin account holds about 0.002 SOL of rent, paid on the first buy and returned when the account is closed after
+// a whole sale. It is part of what went in, but it is not at risk in the trade: profit steps, open P&L and "take out what
+// I put in" are measured against what was swapped, without it. Replayed: counting it against the steps cost Balanced
+// and Spicy 18-25% of their profit (the +6% step fired only once the price was up 8-14% on small positions).
+export const swapped = (p) => Math.max(1e-9, p.solIn - (p.rentSol ?? 0));
+const RENT_MIN = 0.0019, RENT_MAX = 0.00215; // a token account's rent, with room for the larger Token-2022 accounts
 
 export async function balance() { return live() ? liveBalance() : state.paperSol; }
-export function heldSol() { return sellable().reduce((n, p) => n + (Number.isFinite(p.nowSol) ? p.nowSol : p.solIn), 0); }
+export function heldSol() { return sellable().reduce((n, p) => n + (Number.isFinite(p.nowSol) ? p.nowSol + (p.rentSol ?? 0) : p.solIn), 0); } // the rent is still the wallet's, in the coin account
 async function tokenRaw(mint) { return BigInt((await api(`/api/balance?owner=${vault.address}&mint=${mint}`)).tokenRaw ?? '0'); }
 
 async function swap(quoteResponse, exit) {
@@ -78,7 +84,7 @@ export async function buy(t, rules) {
   }
   const price = Number(q.quote.swapUsdValue) / (Number(got) / 10 ** safety.decimals), entry = Number.isFinite(price) && price > 0 ? price : a.price;
   const stop = entry * (1 - (a.stopPct ?? 10) / 100);
-  state.positions.push({ mode: state.mode, mint: t.mint, symbol: t.symbol, pool: t.pool, solIn: spent, tokenRaw: got, entry, stop, baseStop: stop, target: entry * (1 + rules.settings.targetPct / 100), entryBar: a.at ?? Date.now(), openedAt: Date.now(), peak: entry, tf: a.tf === 1 ? 1 : 5, ...(a.style === 'dip' ? { dip: 1 } : {}), style: a.style ?? 'trend', auto: {}, sig, rules: rules.version, costPct, depth: Number.isFinite(a.stretchPct) ? a.stretchPct : null, costs: entryCosts({ requestedSol: size.sol, spentSol: spent, impactPct: q.check.impactPct }) });
+  state.positions.push({ mode: state.mode, mint: t.mint, symbol: t.symbol, pool: t.pool, solIn: spent, tokenRaw: got, entry, stop, baseStop: stop, target: entry * (1 + rules.settings.targetPct / 100), entryBar: a.at ?? Date.now(), openedAt: Date.now(), peak: entry, tf: a.tf === 1 ? 1 : 5, ...(a.style === 'dip' ? { dip: 1 } : {}), style: a.style ?? 'trend', auto: {}, sig, rules: rules.version, costPct, rentSol: spent - size.sol >= RENT_MIN ? Math.min(spent - size.sol, RENT_MAX) : 0, depth: Number.isFinite(a.stretchPct) ? a.stretchPct : null, costs: entryCosts({ requestedSol: size.sol, spentSol: spent, impactPct: q.check.impactPct }) });
   save(); emit('trade', { side: 'buy', symbol: t.symbol, sol: spent });
   talk('induna', `BUY ${spent.toFixed(4)} SOL${live() ? '' : ' (practice)'}. ${rules.settings.stepPct ? `A third at +${rules.settings.stepPct}%, a third at +${rules.settings.stepPct * 2}%, the rest at +${rules.settings.targetPct}%` : `Sell at +${rules.settings.targetPct}%`}, stop −${(a.stopPct ?? 10).toFixed(0)}%, out after ${rules.settings.holdHours} hours.`, 'yes', 'BUY', true);
   talk('umlobi', `Written down: entry $${entry.toPrecision(4)}, round-trip cost ${costPct.toFixed(2)}%, rules ${rules.version}.`);
@@ -102,7 +108,7 @@ export async function sell(p, reason, fraction = 1) {
     // The coin's now-empty account holds about 0.002 SOL of rent: close it and count that rent as part of what came back.
     if (whole) { rent = await reclaim(p.mint); out += rent; } }
   else state.paperSol += out;
-  const cost = whole ? p.solIn : p.solIn * fraction, pnl = out - cost;
+  const cost = whole ? p.solIn : swapped(p) * fraction, pnl = out - cost;
   state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, solIn: cost, solOut: out, pnlSol: pnl, pnlPct: pnl / cost * 100, reason, style: p.style, partial: !whole, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules, costPct: p.costPct ?? null, preset: String(p.rules ?? state.preset).split(/[-+~]/)[0], peakPct: Number.isFinite(p.peak) && p.entry > 0 ? (p.peak / p.entry - 1) * 100 : null, depthPct: p.depth ?? null, px: p.last ?? null, exit: exitSig, rentBackSol: rent, costs: { entry: shareOf(p.costs ?? null, whole ? 1 : fraction), exitImpactPct: q.check.impactPct, exitQuotedSol: Number(q.quote.outAmount) / 1e9 } });
   if (whole) { state.positions = state.positions.filter((x) => x !== p); const R = resolveRules({ preset: state.preset, adapt: dials() }).risk; state.cooldown[p.mint] = Math.max(Date.now() + (pnl < 0 ? R.lossCooldownMinutes : R.cooldownMinutes) * 60_000, p.dip === 1 ? p.openedAt + DIP_REPEAT_HOURS * 3_600_000 : 0); } // the same waits as Laugh
   else { p.solIn -= cost; p.tokenRaw = (held - raw).toString(); p.costs = shareOf(p.costs ?? null, 1 - fraction); delete p.nowSol; setTimeout(() => void requote(p), 300); } // the old value was for the whole position: price what is left now
@@ -153,7 +159,7 @@ export async function watch(rules) {
     if (m.action === 'exit') { await sell(p, m.reason); continue; }
     try { // what the position would fetch right now, for the screen and for the profit steps
       const raw = p.mode === 'live' ? await tokenRaw(p.mint) : BigInt(p.tokenRaw), q = await api(`/api/quote?${new URLSearchParams({ inputMint: p.mint, outputMint: SOL, amount: raw.toString(), exit: '1' })}`);
-      p.nowSol = Number(q.quote.outAmount) / 1e9; const due = partialDue(p, (p.nowSol / p.solIn - 1) * 100, rules.settings);
+      p.nowSol = Number(q.quote.outAmount) / 1e9; const due = partialDue({ ...p, solIn: swapped(p) }, (p.nowSol / swapped(p) - 1) * 100, rules.settings);
       if (due?.kind === 'sell' && await sell(p, due.reason, due.fraction)) p.auto[due.mark] = true;
     } catch { /* priced again next round */ }
   }
