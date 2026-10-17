@@ -2,7 +2,7 @@
 // the shield passed it, the spear saw the tested setup and the commander had room and budget. Positions are watched every
 // 30 seconds. The rules come from the chosen strength (Chill, Balanced, Spicy), tested on real Solana prices.
 import { resolveRules, toQuery } from '/vendor/lib/presets.js';
-import { state, save, api, emit, on, lock, dials } from './store.js';
+import { state, save, api, emit, on, lock, dials, problem, notify } from './store.js';
 import { claimTrading, releaseTrading, holdWhile } from './sync.js';
 import { buy, watch, balance, heldSol, live, sellable, sell } from './trader.js';
 import { bedtimeState } from '/vendor/lib/mood.js';
@@ -35,6 +35,7 @@ async function round() {
     const R = rules(), open = state.positions.filter((p) => p.mode === state.mode);
     // 1. the scout
     const t0 = performance.now(), scan = await api(`/api/scan?${toQuery({ preset: state.preset, adapt: dials() })}`); ms = performance.now() - t0; last = scan; emit('scan', scan);
+    if (scan.sourcesFailed > 0) problem('sources', `${scan.sourcesFailed} of ${scan.sources} coin lists did not answer this round, so fewer coins were watched. Warrior keeps going with the rest.`, 30 * 60_000);
     const read = scan.results ?? [], quiet = read.filter((t) => t.analysis?.quiet).length;
     say('inhloli', `${scan.universe} coins watched; ${read.length} read closely${quiet ? `, ${quiet} too quiet to trade` : ''}.`);
     // 2. the shield
@@ -61,6 +62,7 @@ async function round() {
     // 5. the commander
     const bal = await balance(), equity = bal + heldSol(), start = rollDay(equity);
     const down = start > 0 ? (start - equity) / start * 100 : 0;
+    if (down >= R.risk.dailyLossLimitPct) notify('daily', 'Warrior: daily loss limit reached', `Down ${down.toFixed(1)}% today. No new trades until tomorrow; open positions are still watched.`, 12 * 3_600_000);
     if (down >= R.risk.dailyLossLimitPct) say('induna', `Down ${down.toFixed(1)}% today: the ${R.risk.dailyLossLimitPct}% limit is reached. No new trades until tomorrow.`, 'down');
     else if (sellable().length >= R.risk.maxOpenPositions) say('induna', `Holding ${sellable().length}, the most ${state.preset} allows.`);
     else if (!bed().canOpen) { if (Date.now() - bedSaid > 3_600_000) { bedSaid = Date.now(); say('induna', `Bedtime rule: no new trades until ${bed().wakeAt}. Open positions are still watched.`); } }
@@ -87,7 +89,7 @@ function roundTalk(scan, read, R) {
   if (!near.length) line('umkhonto', 'No coin read closely is under its average right now.', 'wait', 'MISS');
   emit('indaba-line', { who: 'induna', text: 'NOTHING TO STRIKE. Waiting is a position too. Next round in a minute.', tone: 'wait', chip: 'WAIT', verdict: true, count: false });
 }
-async function guard() { if (lock.busy) return; lock.busy = true; try { await watch(rules()); emit('positions'); } catch { /* next time */ } finally { lock.busy = false; } }
+async function guard() { if (lock.busy) return; lock.busy = true; try { await watch(rules()); emit('positions'); } catch (e) { problem('guard', `Open positions could not be checked (${e.message}). Trying again in 30 seconds; their stops are still checked against the live price.`); } finally { lock.busy = false; } }
 
 // Another device's copy of the positions never replaces this one in the middle of a trade.
 holdWhile(() => !lock.busy);
@@ -118,7 +120,7 @@ export async function start() {
 export function losingStreak() { let n = 0; for (const t of state.trades) { if (t.mode !== state.mode || t.partial || t.closedAt < (state.streakFrom ?? 0)) continue; n = t.pnlSol < 0 ? n + 1 : 0; } return n; }
 on('trade', ({ side } = {}) => {
   const limit = state.pauseAfter ?? 4; if (!running || side !== 'sell' || !limit) return;
-  const n = losingStreak(); if (n >= limit) { say('induna', `${n} losing trades in a row: the impi is pausing, as you asked. Open positions keep their stops. Look at the scorecard, then send it out again when you are ready.`, 'down'); stop(); }
+  const n = losingStreak(); if (n >= limit) { notify('pause', 'Warrior paused', `${n} losing trades in a row. Open positions keep their stops; send the impi out again when you are ready.`, 0); say('induna', `${n} losing trades in a row: the impi is pausing, as you asked. Open positions keep their stops. Look at the scorecard, then send it out again when you are ready.`, 'down'); stop(); }
 });
 export function stop() { running = false; nextAt = 0; clearInterval(timer); clearInterval(watcher); void releaseTrading(); releaseTab?.(); releaseTab = null; try { wake?.release(); } catch { /* already gone */ } wake = null; say('induna', 'The impi is resting. Open positions are still yours; start again to keep watching them.'); emit('running'); }
 /** A look without trading, so the dashboard is alive before the impi is sent. */

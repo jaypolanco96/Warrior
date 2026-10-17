@@ -4,7 +4,7 @@
 //    It lives in this tab's memory only while unlocked. The key is never sent anywhere; only signed transactions leave.
 import { Keypair, Transaction, SystemProgram, PublicKey, ed25519 } from '/vendor/solana.js';
 import { lookupId, portableRecord } from '/vendor/lib/sync.js';
-import { sealWallet, openWallet, isSealed, passphraseProblems, toBase58, parseBackupKey } from '/vendor/lib/vault.js';
+import { sealWallet, openWallet, isSealed, passphraseProblems, toBase58, parseBackupKey, addDeviceKey, openWithDeviceKey } from '/vendor/lib/vault.js';
 import { api, post, sleep, emit } from './store.js';
 
 const WKEY = 'warrior.wallet.v1';
@@ -14,7 +14,27 @@ const opened = (p) => { emit('wallet'); emit('vault-open'); if (p) void lookupId
 try { const r = JSON.parse(localStorage.getItem(WKEY) ?? 'null'); if (isSealed(r)) record = r; } catch { /* none yet */ }
 const store = () => localStorage.setItem(WKEY, JSON.stringify(record));
 
+// A passkey (fingerprint, face or device PIN) can open the wallet on this device instead of the passphrase. It works only
+// on this device: the copy synced to your other devices never carries it, and the passphrase always still works.
+const b64 = (u8) => btoa(String.fromCharCode(...u8)), unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+const prfSupported = () => typeof PublicKeyCredential !== 'undefined' && !!navigator.credentials;
+async function deviceKey(credentialId, salt) {
+  const got = await navigator.credentials.get({ publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), rpId: location.hostname, allowCredentials: [{ type: 'public-key', id: unb64(credentialId) }], userVerification: 'required', extensions: { prf: { eval: { first: unb64(salt) } } } } });
+  const first = got?.getClientExtensionResults?.().prf?.results?.first; if (!first) throw new Error('This device or browser cannot unlock wallets with a passkey');
+  return new Uint8Array(first);
+}
 export const vault = {
+  get hasPasskey() { return !!record?.passkey; }, get passkeySupported() { return prfSupported(); },
+  async addPasskey() {
+    if (!record || !dataKey) throw new Error('Unlock the wallet with its passphrase first'); if (!prfSupported()) throw new Error('This browser does not support passkeys');
+    const salt = crypto.getRandomValues(new Uint8Array(32));
+    const made = await navigator.credentials.create({ publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), rp: { name: 'Warrior', id: location.hostname }, user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'Warrior trading wallet', displayName: 'Warrior trading wallet' }, pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }], authenticatorSelection: { residentKey: 'preferred', userVerification: 'required' }, extensions: { prf: { eval: { first: salt } } } } });
+    const ext = made?.getClientExtensionResults?.().prf; if (!made || !ext || ext.enabled === false) throw new Error('This device or browser cannot unlock wallets with a passkey. The passphrase still works');
+    const id = b64(new Uint8Array(made.rawId)), key = ext.results?.first ? new Uint8Array(ext.results.first) : await deviceKey(id, b64(salt));
+    record = await addDeviceKey(record, dataKey, key, id, b64(salt)); store(); emit('wallet');
+  },
+  async unlockDevice() { const o = await openWithDeviceKey(record, await deviceKey(record.passkey.id, record.passkey.prfSalt)); keypair = Keypair.fromSecretKey(o.secret); dataKey = o.dataKey; opened(null); },
+  removePasskey() { if (record?.passkey) { record = { ...record, passkey: null }; store(); emit('wallet'); } },
   get exists() { return !!record; }, get unlocked() { return !!keypair; }, get keypair() { return keypair; },
   get address() { return record?.address ?? ''; },
   checkPassphrase(p, again) { const bad = passphraseProblems(p); if (bad.length) throw new Error(bad[0]); if (p !== again) throw new Error('The two passphrases do not match'); },

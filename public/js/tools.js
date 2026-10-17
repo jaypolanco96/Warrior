@@ -1,7 +1,8 @@
 // Your own hands on a position, the Laugh way: add funds, sell part (25/50/75/100%), take out what you put in, your own
 // stop and target, sell-above orders and take-profit steps. Plus the order engine that runs them and the portfolio.
 // Orders live in the synced state, so every device you open Warrior on sees them; only the device that is open runs them.
-import { state, save, emit, on, exclusive, lock } from './store.js';
+import { state, save, emit, on, exclusive, lock, problem } from './store.js';
+import { moodCheck } from '/vendor/lib/mood.js';
 import { sell, addFunds, liveStops, swapped } from './trader.js';
 import { impi, rules } from './impi.js';
 import { validateOrder, orderDue, validateExits, ORDER_LIMITS } from '/vendor/lib/orders.js';
@@ -51,7 +52,9 @@ export function openPosition(start) {
   for (const v of [0.05, 0.1, 0.25, 0.5]) quick.append(button(`${v} SOL`, 'ghost small', () => { amt.value = String(v); }));
   let armed = 0;
   add.append(wA, quick, button(mode === 'live' ? `Add to ${p0.symbol} (real SOL)` : `Practice: add to ${p0.symbol}`, '', () => {
-    if (mode === 'live' && Date.now() - armed > 6000) { armed = Date.now(); sA.textContent = 'Tap again within 6 seconds: this buys with REAL SOL.'; return; }
+    // The mood guard (from Laugh): going straight back into a coin that just lost, or adding after a losing streak, asks twice.
+    const mood = moodCheck({ trades: state.trades.filter((t) => t.mode === mode), proposed: { mint, sol: Number(amt.value) } });
+    if ((mood || mode === 'live') && Date.now() - armed > 8000) { armed = Date.now(); sA.textContent = `${mood ? `${mood.message} ` : ''}${mode === 'live' ? 'This buys with REAL SOL. ' : ''}Tap again within 8 seconds to go ahead.`; return; }
     return run(sA, async () => { const p = find(mint, mode); if (!p) throw new Error('that position is no longer open'); return addFunds(p, Number(amt.value), rules().risk.slippageBps); }, () => { const p = find(mint, mode); return `Added. You now have ${p.solIn.toFixed(4)} SOL in ${p.symbol}, at an average of ${usd(p.entry)} a coin.`; });
   }), sA);
 
@@ -127,7 +130,7 @@ async function orderStep() {
 async function engine() {
   if (lock.busy || !state.positions.some((p) => p.mode === state.mode)) { drawPortfolio(); return; }
   lock.busy = true;
-  try { await liveStops({ auto: impi.running }); await orderStep(); } catch { /* next time */ }
+  try { await liveStops({ auto: impi.running }); await orderStep(); } catch (e) { problem('engine', `Your stops and orders could not be checked this time (${e.message}). Trying again in 15 seconds.`); }
   finally { lock.busy = false; save(); drawOrders(); drawPortfolio(); emit('positions'); }
 }
 setInterval(engine, 15_000);

@@ -19,6 +19,12 @@ export function save() {
 }
 /** The self-ruling moves in force for a strength (see adapt.js); {} when none. */
 export const dials = (preset = state.preset) => state.adapt?.[preset]?.dials ?? {};
+/** A problem worth knowing about: said in the live feed (and as an alert, if alerts are on), at most once per `everyMs` per kind. */
+const lastProblem = {};
+export function problem(key, text, everyMs = 600_000) { if (Date.now() - (lastProblem[key] ?? 0) < everyMs) return; lastProblem[key] = Date.now(); emit('say', { who: 'umlobi', text, tone: 'down' }); emit('alert', { title: 'Warrior: something needs a look', body: text }); }
+/** An event worth an alert (a pause, the daily limit), at most once per `everyMs` per kind. */
+const lastNote = {};
+export function notify(key, title, body, everyMs = 3_600_000) { if (Date.now() - (lastNote[key] ?? 0) < everyMs) return; lastNote[key] = Date.now(); emit('alert', { title, body }); }
 export const SOL = 'So11111111111111111111111111111111111111112';
 export async function api(path, init) {
   const r = await fetch(path, init); let j = null; try { j = await r.json(); } catch { /* not JSON */ }

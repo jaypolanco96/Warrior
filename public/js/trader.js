@@ -4,6 +4,7 @@
 import { VersionedTransaction, Transaction, TransactionInstruction, PublicKey, SystemProgram } from '/vendor/solana.js';
 import { unexpectedPrograms, closableAccounts, CLOSE_ACCOUNT_DATA, sweepLamports } from '/vendor/lib/vault.js';
 import { entryCosts, addEntryCosts, shareOf } from '/vendor/lib/receipt.js';
+import { coachAfter } from '/vendor/lib/coach.js';
 import { positionSize } from '/vendor/lib/risk.js';
 import { partialDue, autoExitDue, ownExitDue, confirm, poolEmptied } from '/vendor/lib/orders.js';
 import { state, save, api, post, SOL, emit, dials } from './store.js';
@@ -114,6 +115,7 @@ export async function sell(p, reason, fraction = 1) {
   else { p.solIn -= cost; p.tokenRaw = (held - raw).toString(); p.costs = shareOf(p.costs ?? null, 1 - fraction); delete p.nowSol; setTimeout(() => void requote(p), 300); } // the old value was for the whole position: price what is left now
   save(); emit('trade', { side: 'sell', symbol: p.symbol, pnl, mint: p.mint, pool: p.pool, px: p.last ?? null, reason, whole, preset: String(p.rules ?? state.preset).split(/[-+~]/)[0] });
   say('umlobi', `SELL ${p.symbol}${whole ? '' : ` (${Math.round(fraction * 100)}%)`}: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} SOL (${(pnl / cost * 100).toFixed(1)}%) · ${reason}${rent > 0 ? ` · ${rent.toFixed(4)} SOL of account rent back` : ''}.`, pnl >= 0 ? 'up' : 'down');
+  try { const c = coachAfter(state.trades.at(-1)); say('umlobi', `Coach: ${c.happened} ${c.learned}`); } catch { /* the trade is recorded either way */ }
   if (isLive && whole) await sweep();
   return true;
 }

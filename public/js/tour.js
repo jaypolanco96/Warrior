@@ -75,6 +75,7 @@ function render() {
 function go(k) {
   if (k < 0 || k >= STEPS.length) { if (k >= STEPS.length) close(true); return; }
   i = k; const t = target(STEPS[i]);
+  if (t) window.dispatchEvent(new CustomEvent('warrior-reveal', { detail: t.closest('.card') })); // a folded panel opens to be shown
   if (!t) { go(k + 1); return; } // a panel missing from this layout: skip it
   frame.classList.remove('tour-pulse'); render();
   const tall = t.getBoundingClientRect().height > window.innerHeight * 0.55;

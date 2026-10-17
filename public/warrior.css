@@ -364,3 +364,12 @@ dialog .dlg{max-height:calc(100vh - 40px);overflow:auto}
 @media (max-width:520px){.care .fields.three,.care .fields{grid-template-columns:minmax(0,1fr)}}
 .care-grid{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}.care input[type=time]{padding:9px 6px;font-size:13px}@media (max-width:900px){.care-grid{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:1100px) and (min-width:701px){.desk{grid-template-areas:"core core" "agents pnl" "flow dist" "positions positions" "indaba indaba" "adapt watchtower" "portfolio score" "log log" "care care" "wallet wallet"}}
+
+/* folding on phones */
+.card.foldable > .label{cursor:pointer;user-select:none;min-height:32px;padding-right:28px;position:relative}
+.card.foldable > .label::after{content:"";position:absolute;right:4px;top:50%;width:8px;height:8px;border-right:2px solid var(--soft);border-bottom:2px solid var(--soft);transform:translateY(-70%) rotate(45deg);transition:transform .2s}
+.card.foldable.folded > .label::after{transform:translateY(-30%) rotate(-45deg)}
+.card.folded > :not(.label){display:none!important}
+.card.folded > .label{margin-bottom:0}
+.care-wide{grid-column:1/-1;border-top:1px dashed var(--line);padding-top:10px;margin-top:6px}
+#alerts-toggle[aria-pressed=true]{border-color:var(--up);color:var(--up)}
