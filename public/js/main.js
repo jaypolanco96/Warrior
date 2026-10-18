@@ -6,6 +6,7 @@ import { vault, owner, connectPhantom, disconnectPhantom, reconnectPhantom, fund
 import { AGENTS, impi, start, stop, peek, rules } from './impi.js';
 import { sell, sellAll, balance, heldSol, writeOff, swapped } from './trader.js';
 import { receipt } from '/vendor/lib/receipt.js';
+import { MARKET_TYPES } from '/vendor/lib/activity.js';
 import { csvCell } from '/vendor/lib/portfolio.js';
 import { validateBedtime, bedtimeText } from '/vendor/lib/mood.js';
 import { startNet, setData } from './net.js';
@@ -56,9 +57,13 @@ on('say', ({ who, text, tone }) => {
 // ---------- market panels ----------
 on('scan', (scan) => {
   const read = scan.results ?? [];
+  const activity = scan.activity;
+  $('activity-basis').textContent = activity ? `Automatic scan attention · mature coins ${activity.matureIncluded ? 'included' : 'excluded'} · reported hourly USD turnover in observed lists, not net SOL inflow. ${activity.sourcesFailed ? `${activity.sourcesFailed} source${activity.sourcesFailed === 1 ? '' : 's'} unavailable.` : ''}` : 'Activity coverage unavailable for this scan.';
+  $('activity-mix').textContent = activity?.groups?.filter((g) => g.coins).map((g) => `${g.label}: ${g.sharePct === null ? 'unknown' : g.sharePct.toFixed(1) + '%'} · ${g.selected} read / ${g.coins} seen`).join(' | ') ?? '';
   $('flow').replaceChildren(...read.slice(0, 14).map((t) => { const tr = el('tr'), c5 = t.change?.m5 ?? 0, c1 = t.change?.h1 ?? 0;
     const gap = t.analysis?.stretchPct, hot = Number.isFinite(gap) && gap <= -(rules().settings.dipBelowPct ?? 10); if (hot || t.analysis?.decision === 'enter') tr.className = 'hot';
     tr.append(el('td', '', String(t.symbol).slice(0, 10)), el('td', c5 >= 0 ? 'up' : 'down', pct(c5)), el('td', c1 >= 0 ? 'up' : 'down', pct(c1)), el('td', Number.isFinite(gap) && gap < 0 ? 'down' : '', Number.isFinite(gap) ? pct(gap) : '—'), el('td', '', money(t.volume1hUsd))); return tr; }));
+  for (const [i, row] of [...$('flow').children].entries()) row.firstChild.append(el('small', 'coin-type', MARKET_TYPES[read[i].marketType] ?? ''));
   figures();
   hist($('dist-chart'), read.map((t) => t.analysis?.stretchPct), -(rules().settings.dipBelowPct ?? 10));
   bars($('bars'), read.map((t) => t.volume1hUsd ?? 0));

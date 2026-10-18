@@ -383,3 +383,9 @@ dialog .dlg{max-height:calc(100vh - 40px);overflow:auto}
 .pos-head h3,#dlg-title{min-width:0;overflow-wrap:anywhere}
 #dlg-status{overflow-wrap:anywhere}
 @media (max-width:700px){.positions .book td:first-child{max-width:none}}
+/* Activity stays readable inside the existing Order Flow card on phones. */
+.flow .small { overflow-wrap: anywhere; line-height: 1.5; }
+.flow .book { table-layout: fixed; }
+.flow .book th, .flow .book td { white-space: normal; overflow-wrap: anywhere; }
+.flow .book th, .flow .book td { padding-left: 3px; padding-right: 3px; }
+.coin-type { display: block; font-size: 9px; opacity: .7; }

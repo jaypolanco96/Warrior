@@ -36,7 +36,10 @@ try {
     if (url.origin !== base) return route.abort();
     if (!url.pathname.startsWith('/api/')) return route.continue();
     let json = {};
-    if (url.pathname === '/api/scan') json = { universe: 0, scanned: 0, results: [], sources: 1, sourcesFailed: 0, rejected: 0, passedScreen: 0 };
+    if (url.pathname === '/api/scan') {
+      check(url.searchParams.get('mature') === '1', 'desk and strength scans explicitly include mature coins');
+      json = { universe: 3, scanned: 1, results: [{ symbol: 'MATURE', marketType: 'mature', volume1hUsd: 1000000, change: { m5: -2, h1: -5 }, analysis: { decision: 'wait', reasons: [] } }], sources: 2, sourcesFailed: 1, rejected: 1, passedScreen: 2, activity: { matureIncluded: true, sourcesFailed: 1, groups: [{ label: 'Mature', coins: 2, selected: 1, sharePct: 75 }, { label: 'Rocket launches', coins: 1, selected: 0, sharePct: 25 }] } };
+    }
     if (url.pathname === '/api/balance') json = { sol: 1, tokenRaw: '0' };
     if (url.pathname === '/api/chain') json = { blockhash: '11111111111111111111111111111111' };
     if (url.pathname === '/api/status') json = { outcome };
@@ -79,6 +82,14 @@ try {
   });
   check(startingResult.mode === 'paper' && startingResult.why === null, 'mode cannot change while the impi is acquiring its trading lock');
   await waitIdle();
+
+  await page.evaluate(async () => {
+    const { emit } = await import('/js/store.js');
+    emit('scan', { universe: 3, scanned: 1, results: [{ symbol: 'MATURE', marketType: 'mature', volume1hUsd: 1000000, change: { m5: -2, h1: -5 }, analysis: { decision: 'wait' } }], activity: { matureIncluded: true, sourcesFailed: 1, groups: [{ label: 'Mature', coins: 2, selected: 1, sharePct: 75 }, { label: 'Rocket launches', coins: 1, selected: 0, sharePct: 25 }] } });
+  });
+  check((await page.locator('#activity-basis').textContent()).includes('not net SOL inflow'), 'activity explains the actual measurement');
+  check((await page.locator('#activity-mix').textContent()).includes('Rocket launches: 25.0% · 0 read / 1 seen'), 'unsafe launch interest is visible without a trade');
+  check((await page.locator('#flow .coin-type').textContent()) === 'Mature', 'watched coins show their category');
 
   // Throwaway keys exist only in this isolated context. Phantom never contacts a chain.
   await page.evaluate(async () => {
@@ -198,12 +209,14 @@ try {
     check(overflow.body <= overflow.width + 1, `${theme} ${width}px: no page overflow (${JSON.stringify(overflow)})`);
     const portfolioFits = await page.locator('.pf-list').last().evaluate((list) => list.scrollWidth <= list.clientWidth + 1);
     check(portfolioFits, `${theme} ${width}px: long token names leave portfolio values reachable`);
+    check(await page.locator('.card.flow').evaluate(n => n.scrollWidth <= n.clientWidth + 1), `${theme} ${width}px: activity report and order flow fit the card`);
     await fund(); await page.locator('#f-s').fill('0.125');
     const rect = await page.locator('#dlg-close').boundingBox();
     check(rect.x >= 0 && rect.x + rect.width <= width + 1, `${theme} ${width}px: dialog Close is reachable`);
     if (artifacts && [390, 1440].includes(width)) await page.screenshot({ path: resolve(artifacts, `fund-${theme}-${width}.png`) });
     await close();
     if (artifacts && [390, 1440].includes(width)) { await page.locator('.card.care').screenshot({ path: resolve(artifacts, `care-${theme}-${width}.png`) }); }
+    if (artifacts && [390, 1440].includes(width)) await page.locator('.card.flow').screenshot({ path: resolve(artifacts, `activity-${theme}-${width}.png`) });
   }
   for (const [width, height] of [[320, 800], [390, 800], [1024, 800], [1440, 800], [700, 320]]) {
     await page.setViewportSize({ width, height });

@@ -6,6 +6,7 @@ import { unexpectedPrograms, closableAccounts, CLOSE_ACCOUNT_DATA, sweepLamports
 import { entryCosts, addEntryCosts, shareOf } from '/vendor/lib/receipt.js';
 import { coachAfter } from '/vendor/lib/coach.js';
 import { positionSize } from '/vendor/lib/risk.js';
+import { marketType } from '/vendor/lib/activity.js';
 import { partialDue, autoExitDue, ownExitDue, confirm, poolEmptied } from '/vendor/lib/orders.js';
 import { state, save, api, post, SOL, emit, dials } from './store.js';
 import { resolveRules, toQuery } from '/vendor/lib/presets.js';
@@ -85,7 +86,7 @@ export async function buy(t, rules) {
   }
   const price = Number(q.quote.swapUsdValue) / (Number(got) / 10 ** safety.decimals), entry = Number.isFinite(price) && price > 0 ? price : a.price;
   const stop = entry * (1 - (a.stopPct ?? 10) / 100);
-  state.positions.push({ mode: state.mode, mint: t.mint, symbol: t.symbol, pool: t.pool, solIn: spent, tokenRaw: got, entry, stop, baseStop: stop, target: entry * (1 + rules.settings.targetPct / 100), entryBar: a.at ?? Date.now(), openedAt: Date.now(), peak: entry, tf: a.tf === 1 ? 1 : 5, ...(a.style === 'dip' ? { dip: 1 } : {}), style: a.style ?? 'trend', auto: {}, sig, rules: rules.version, costPct, rentSol: spent - size.sol >= RENT_MIN ? Math.min(spent - size.sol, RENT_MAX) : 0, depth: Number.isFinite(a.stretchPct) ? a.stretchPct : null, costs: entryCosts({ requestedSol: size.sol, spentSol: spent, impactPct: q.check.impactPct }) });
+  state.positions.push({ mode: state.mode, mint: t.mint, symbol: t.symbol, pool: t.pool, discovery: { policy: 'activity-v1', category: marketType(t), activity: t.activity ?? null }, solIn: spent, tokenRaw: got, entry, stop, baseStop: stop, target: entry * (1 + rules.settings.targetPct / 100), entryBar: a.at ?? Date.now(), openedAt: Date.now(), peak: entry, tf: a.tf === 1 ? 1 : 5, ...(a.style === 'dip' ? { dip: 1 } : {}), style: a.style ?? 'trend', auto: {}, sig, rules: rules.version, costPct, rentSol: spent - size.sol >= RENT_MIN ? Math.min(spent - size.sol, RENT_MAX) : 0, depth: Number.isFinite(a.stretchPct) ? a.stretchPct : null, costs: entryCosts({ requestedSol: size.sol, spentSol: spent, impactPct: q.check.impactPct }) });
   save(); emit('trade', { side: 'buy', symbol: t.symbol, sol: spent });
   talk('induna', `BUY ${spent.toFixed(4)} SOL${live() ? '' : ' (practice)'}. ${rules.settings.stepPct ? `A third at +${rules.settings.stepPct}%, a third at +${rules.settings.stepPct * 2}%, the rest at +${rules.settings.targetPct}%` : `Sell at +${rules.settings.targetPct}%`}, stop −${(a.stopPct ?? 10).toFixed(0)}%, out after ${rules.settings.holdHours} hours.`, 'yes', 'BUY', true);
   talk('umlobi', `Written down: entry $${entry.toPrecision(4)}, round-trip cost ${costPct.toFixed(2)}%, rules ${rules.version}.`);
@@ -110,7 +111,7 @@ export async function sell(p, reason, fraction = 1) {
     if (whole) { rent = await reclaim(p.mint); out += rent; } }
   else state.paperSol += out;
   const cost = whole ? p.solIn : swapped(p) * fraction, pnl = out - cost;
-  state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, solIn: cost, solOut: out, pnlSol: pnl, pnlPct: pnl / cost * 100, reason, style: p.style, partial: !whole, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules, costPct: p.costPct ?? null, preset: String(p.rules ?? state.preset).split(/[-+~]/)[0], peakPct: Number.isFinite(p.peak) && p.entry > 0 ? (p.peak / p.entry - 1) * 100 : null, depthPct: p.depth ?? null, px: p.last ?? null, exit: exitSig, rentBackSol: rent, costs: { entry: shareOf(p.costs ?? null, whole ? 1 : fraction), exitImpactPct: q.check.impactPct, exitQuotedSol: Number(q.quote.outAmount) / 1e9 } });
+  state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, discovery: p.discovery ?? null, solIn: cost, solOut: out, pnlSol: pnl, pnlPct: pnl / cost * 100, reason, style: p.style, partial: !whole, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules, costPct: p.costPct ?? null, preset: String(p.rules ?? state.preset).split(/[-+~]/)[0], peakPct: Number.isFinite(p.peak) && p.entry > 0 ? (p.peak / p.entry - 1) * 100 : null, depthPct: p.depth ?? null, px: p.last ?? null, exit: exitSig, rentBackSol: rent, costs: { entry: shareOf(p.costs ?? null, whole ? 1 : fraction), exitImpactPct: q.check.impactPct, exitQuotedSol: Number(q.quote.outAmount) / 1e9 } });
   if (whole) { state.positions = state.positions.filter((x) => x !== p); const R = resolveRules({ preset: state.preset, adapt: dials() }).risk; state.cooldown[p.mint] = Math.max(Date.now() + (pnl < 0 ? R.lossCooldownMinutes : R.cooldownMinutes) * 60_000, p.dip === 1 ? p.openedAt + DIP_REPEAT_HOURS * 3_600_000 : 0); } // the same waits as Laugh
   else { p.solIn -= cost; p.tokenRaw = (held - raw).toString(); p.costs = shareOf(p.costs ?? null, 1 - fraction); delete p.nowSol; setTimeout(() => void requote(p), 300); } // the old value was for the whole position: price what is left now
   save(); emit('trade', { side: 'sell', symbol: p.symbol, pnl, mint: p.mint, pool: p.pool, px: p.last ?? null, reason, whole, preset: String(p.rules ?? state.preset).split(/[-+~]/)[0] });
@@ -143,7 +144,7 @@ async function sweep() {
  */
 export function writeOff(p) {
   if (!p.empty) return false;
-  state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, solIn: p.solIn, solOut: 0, pnlSol: -p.solIn, pnlPct: -100, reason: 'written-off', style: p.style, partial: false, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules, preset: String(p.rules ?? state.preset).split(/[-+~]/)[0], exit: 'none', costs: { entry: p.costs ?? null } });
+  state.trades.push({ mode: p.mode, symbol: p.symbol, mint: p.mint, discovery: p.discovery ?? null, solIn: p.solIn, solOut: 0, pnlSol: -p.solIn, pnlPct: -100, reason: 'written-off', style: p.style, partial: false, openedAt: p.openedAt, closedAt: Date.now(), rules: p.rules, preset: String(p.rules ?? state.preset).split(/[-+~]/)[0], exit: 'none', costs: { entry: p.costs ?? null } });
   state.positions = state.positions.filter((x) => x !== p); state.cooldown[p.mint] = Date.now() + 30 * 86_400_000; save();
   emit('trade', { side: 'sell', symbol: p.symbol, pnl: -p.solIn, mint: p.mint, reason: 'written-off', whole: true });
   say('umlobi', `${p.symbol} written off: ${p.solIn.toFixed(4)} SOL in, nothing out. Its pool was emptied and it could not be sold${p.mode === 'live' ? '' : ' (practice)'}.`, 'down'); return true;

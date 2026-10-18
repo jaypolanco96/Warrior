@@ -10,5 +10,5 @@ copyFileSync('lib/joy.mjs', 'public/vendor/joy-rules.js');
 // The strategy, risk, preset, order and portfolio rules are shipped the same way: one source, tested in Node, used by both
 // the server and the page. Imports are rewritten from .mjs to .js so every host serves them as scripts.
 mkdirSync('public/vendor/lib', { recursive: true });
-for (const name of ['indicators', 'strategy', 'risk', 'presets', 'orders', 'portfolio', 'follow', 'coach', 'receipt', 'mood', 'story', 'scorecard', 'vault', 'rocket', 'sync', 'adapt']) writeFileSync(`public/vendor/lib/${name}.js`, readFileSync(`lib/${name}.mjs`, 'utf8').replace(/(from\s+'\.\/[\w-]+)\.mjs'/g, "$1.js'"));
+for (const name of ['indicators', 'strategy', 'risk', 'presets', 'orders', 'portfolio', 'follow', 'coach', 'receipt', 'mood', 'story', 'scorecard', 'vault', 'rocket', 'sync', 'adapt', 'activity']) writeFileSync(`public/vendor/lib/${name}.js`, readFileSync(`lib/${name}.mjs`, 'utf8').replace(/(from\s+'\.\/[\w-]+)\.mjs'/g, "$1.js'"));
 console.log('Bundled public/vendor/solana.js and copied the feel rules and the trading rules');

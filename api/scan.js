@@ -5,7 +5,7 @@ import { fromQuery } from '../lib/presets.mjs';
 export default async function handler(req, res) {
   let rules; try { rules = fromQuery(req.query ?? {}); } catch (e) { res.setHeader('Cache-Control', 'no-store'); return res.status(400).json({ error: `Those settings are not valid: ${e.message}.` }); }
   try {
-    const started = Date.now(), result = await scan({ mature: req.query?.mature === '1', limit: 36, settings: rules.settings, risk: rules.risk });
+    const started = Date.now(), result = await scan({ mature: req.query?.mature !== '0', limit: 36, settings: rules.settings, risk: rules.risk });
     // A scan where some candles could not be read is kept only briefly, so the next visitor gets a fuller one.
     const incomplete = result.results.some((t) => t.bars === 0);
     res.setHeader('Cache-Control', incomplete ? 'public, s-maxage=20' : 'public, s-maxage=20, stale-while-revalidate=30');

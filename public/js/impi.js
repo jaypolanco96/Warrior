@@ -35,7 +35,7 @@ async function round() {
   try {
     const R = rules(), open = state.positions.filter((p) => p.mode === state.mode);
     // 1. the scout
-    const t0 = performance.now(), scan = await api(`/api/scan?${toQuery({ preset: state.preset, adapt: dials() })}`); ms = performance.now() - t0; last = scan; emit('scan', scan);
+    const t0 = performance.now(), scan = await api(`/api/scan?${toQuery({ preset: state.preset, adapt: dials() })}&mature=1`); ms = performance.now() - t0; last = scan; emit('scan', scan);
     if (scan.sourcesFailed > 0) problem('sources', `${scan.sourcesFailed} of ${scan.sources} coin lists did not answer this round, so fewer coins were watched. Warrior keeps going with the rest.`, 30 * 60_000);
     const read = scan.results ?? [], quiet = read.filter((t) => t.analysis?.quiet).length;
     say('inhloli', `${scan.universe} coins watched; ${read.length} read closely${quiet ? `, ${quiet} too quiet to trade` : ''}.`);
@@ -131,4 +131,4 @@ on('trade', ({ side } = {}) => {
 export function stop() { running = false; nextAt = 0; clearInterval(timer); clearInterval(watcher); void releaseTrading(); releaseTab?.(); releaseTab = null; try { wake?.release(); } catch { /* already gone */ } wake = null; say('induna', 'The impi is resting. Open positions are still yours; start again to keep watching them.'); emit('running'); }
 on('vault-locked', () => { if (live() && running) { stop(); say('induna', 'The trading wallet is locked. Live trading is paused; unlock it and send the impi again to watch your positions.', 'down'); } });
 /** A look without trading, so the dashboard is alive before the impi is sent. */
-export async function peek() { try { const t0 = performance.now(), scan = await api(`/api/scan?${toQuery({ preset: state.preset, adapt: dials() })}`); ms = performance.now() - t0; last = scan; emit('scan', scan); } catch { /* shown next time */ } }
+export async function peek() { try { const t0 = performance.now(), scan = await api(`/api/scan?${toQuery({ preset: state.preset, adapt: dials() })}&mature=1`); ms = performance.now() - t0; last = scan; emit('scan', scan); } catch { /* shown next time */ } }

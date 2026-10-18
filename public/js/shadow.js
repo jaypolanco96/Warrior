@@ -37,7 +37,7 @@ export async function shadowRound(known = {}) {
         }
       }
       // then entries
-      const scan = known[preset] ?? await api(`/api/scan?${toQuery({ preset })}`), owned = new Set(b.positions.map((p) => p.mint));
+      const scan = known[preset] ?? await api(`/api/scan?${toQuery({ preset })}&mature=1`), owned = new Set(b.positions.map((p) => p.mint));
       for (const t of (scan.results ?? []).filter((x) => x.analysis?.decision === 'enter' && x.analysis.style !== 'smart' && !owned.has(x.mint) && Number.isFinite(x.priceUsd))) {
         if (b.positions.length >= R.risk.maxOpenPositions) break;
         const a = t.analysis, eq = b.sol + held(b), size = positionSize({ balanceSol: b.sol, equitySol: eq, stopPct: a.stopPct ?? 10, openPositions: b.positions.length, dayPnlSol: 0, sizeFactor: a.sizeFactor ?? 1 }, R.risk);
