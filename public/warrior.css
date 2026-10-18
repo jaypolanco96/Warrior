@@ -381,4 +381,5 @@ dialog .dlg{max-height:calc(100vh - 40px);overflow:auto}
 .pf-list li > span{min-width:0;overflow-wrap:anywhere}
 .positions .book td:first-child{max-width:160px;white-space:normal;overflow-wrap:anywhere}
 .pos-head h3,#dlg-title{min-width:0;overflow-wrap:anywhere}
+#dlg-status{overflow-wrap:anywhere}
 @media (max-width:700px){.positions .book td:first-child{max-width:none}}

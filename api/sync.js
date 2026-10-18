@@ -13,7 +13,7 @@ async function redis(...cmd) {
   if (!URL_ || !TOKEN) { // local checks only
     const [op, key, ...rest] = cmd;
     if (op === 'GET') return memory.get(key) ?? null;
-    if (op === 'SET') { memory.set(key, rest[0]); return 'OK'; }
+    if (op === 'SET') { if (rest[1] === 'NX' && memory.has(key)) return null; memory.set(key, rest[0]); return 'OK'; }
     if (op === 'INCR') { const n = Number(memory.get(key) ?? 0) + 1; memory.set(key, String(n)); return n; }
     if (op === 'EXPIRE' || op === 'DEL') { if (op === 'DEL') memory.delete(key); return 1; }
     if (op === 'EVAL') { const [, , , k, base, value] = cmd; const cur = memory.get(k); const ver = cur ? JSON.parse(cur).version : 0; if (String(ver) !== base && base !== 'force') return JSON.stringify({ conflict: ver }); memory.set(k, value); return 'OK'; }
@@ -52,8 +52,16 @@ export default async function handler(req, res) {
       case 'record': { // save the locked wallet under its id
         const r = b.record;
         if (!isId(b.id) || !isSealed(r) || r.passkey || !isAddress(r.address) || !fresh(b.ts) || JSON.stringify(r).length > 4000) return res.status(400).json({ error: 'Bad request.' });
-        if (!signedBy(r.address, signedText.record({ id: b.id, address: r.address, ts: b.ts }), b.sig)) return res.status(403).json({ error: 'Not signed by this wallet.' });
-        await redis('SET', `warrior:rec:${b.id}`, JSON.stringify(r)); return res.status(200).json({ ok: true });
+        const digest = await digestOf(JSON.stringify(r));
+        if (!signedBy(r.address, signedText.record({ id: b.id, address: r.address, digest, ts: b.ts }), b.sig)) return res.status(403).json({ error: 'Not signed by this wallet.' });
+        const key = `warrior:rec:${b.id}`, value = JSON.stringify(r);
+        // An id already assigned to a wallet cannot be replaced by a different wallet's valid signature.
+        if (!(await redis('SET', key, value, 'NX'))) {
+          const existing = JSON.parse(await redis('GET', key));
+          if (existing?.address !== r.address) return res.status(409).json({ error: 'This sync lookup already belongs to another wallet. Your local wallet is unchanged. Use a unique passphrase for each wallet.' });
+          await redis('SET', key, value);
+        }
+        return res.status(200).json({ ok: true });
       }
       case 'get': { // the encrypted trading data and its version
         if (!isAddress(b.address)) return res.status(400).json({ error: 'Bad request.' });

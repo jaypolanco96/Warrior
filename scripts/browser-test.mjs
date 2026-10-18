@@ -5,6 +5,8 @@ import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { chromium } from 'playwright-core';
+import { Transaction, TransactionMessage, TransactionInstruction, VersionedTransaction, PublicKey, SystemProgram, Keypair } from '@solana/web3.js';
+import { createPublicKey, verify } from 'node:crypto';
 
 const root = resolve('public');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
@@ -38,7 +40,11 @@ try {
     if (url.pathname === '/api/balance') json = { sol: 1, tokenRaw: '0' };
     if (url.pathname === '/api/chain') json = { blockhash: '11111111111111111111111111111111' };
     if (url.pathname === '/api/status') json = { outcome };
-    if (url.pathname === '/api/send') json = { signature: 'synthetic-withdrawal' };
+    if (url.pathname === '/api/send') {
+      const body = route.request().postDataJSON(), tx = Transaction.from(Buffer.from(body.transaction, 'base64'));
+      check(tx.verifySignatures(), 'withdrawal signature is valid after private key encapsulation');
+      json = { signature: 'synthetic-withdrawal' };
+    }
     if (url.pathname === '/api/coin') json = { prices: {}, liquidity: {} };
     if (url.pathname === '/api/manage') json = { results: [] };
     if (url.pathname === '/api/sync') return route.fulfill({ status: 503, json: { setup: true } });
@@ -227,6 +233,73 @@ try {
   await page.locator('#f-p').fill('not a real passphrase');
   await page.keyboard.press('Escape');
   check(await page.locator('#dlg').evaluate((d) => !d.open), 'Escape closes the wallet dialog without tutorial interception');
+  // Key protection uses only the existing Unlock, Backup key, Show and Close controls.
+  const phrase = 'synthetic browser test passphrase';
+  await page.getByRole('button', { name: 'Unlock', exact: true }).click();
+  await page.locator('#f-p').fill(phrase); await page.locator('#dlg-go').click();
+  await page.waitForFunction(() => !document.getElementById('dlg').open);
+  check(await page.evaluate(async () => { const { vault } = await import('/js/wallet.js'); return vault.unlocked && vault.keypair === undefined && vault.syncKey === undefined; }), 'wallet modules do not export raw signing or encryption keys');
+  const walletAddress = await page.evaluate(async () => (await import('/js/wallet.js')).vault.address);
+  const fixture = (payer, unexpected = false) => new VersionedTransaction(new TransactionMessage({
+    payerKey: new PublicKey(payer), recentBlockhash: '11111111111111111111111111111111',
+    instructions: [unexpected ? new TransactionInstruction({ programId: Keypair.fromSeed(new Uint8Array(32).fill(9)).publicKey, keys: [], data: Buffer.alloc(0) }) : SystemProgram.transfer({ fromPubkey: new PublicKey(payer), toPubkey: SystemProgram.programId, lamports: 1 })]
+  }).compileToV0Message()).serialize();
+  const signFixture = (bytes) => page.evaluate(async (bytes) => {
+    const { vault } = await import('/js/wallet.js'), { VersionedTransaction } = await import('/vendor/solana.js');
+    const tx = VersionedTransaction.deserialize(Uint8Array.from(bytes));
+    try { vault.signTransaction(tx); return { signed: [...tx.serialize()] }; } catch (e) { return { error: e.message }; }
+  }, [...bytes]);
+  const signedFixture = await signFixture(fixture(walletAddress));
+  check(!!signedFixture.signed, 'versioned transactions still sign without exporting the private key');
+  const signed = VersionedTransaction.deserialize(Uint8Array.from(signedFixture.signed));
+  const spki = Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), new PublicKey(walletAddress).toBuffer()]);
+  check(verify(null, Buffer.from(signed.message.serialize()), createPublicKey({ key: spki, format: 'der', type: 'spki' }), Buffer.from(signed.signatures[0])), 'versioned signature verifies against the wallet address');
+  check(!!(await signFixture(fixture(SystemProgram.programId))).error, 'signer refuses a different fee payer');
+  check(!!(await signFixture(fixture(walletAddress, true))).error, 'signer refuses an unexpected program');
+  check(await page.evaluate(async () => { const { vault } = await import('/js/wallet.js'); const snapshot = { 'warrior.auto.state.v1': JSON.stringify({ positions: [] }) }; return JSON.stringify(await vault.openSnapshot(await vault.sealSnapshot(snapshot))) === JSON.stringify(snapshot); }), 'encrypted sync round-trips without exporting its encryption key');
+  const backupButton = () => page.locator('#w-body').getByRole('button', { name: /^(Backup key|Save the backup key \(needed for live\))$/ }).click();
+  const reveal = async () => { await backupButton(); await page.locator('#f-p').fill(phrase); await page.locator('#dlg-go').click(); await page.waitForFunction(() => document.getElementById('dlg-status').textContent.startsWith('Backup key: ')); };
+  await page.clock.install();
+  await reveal();
+  check(await page.locator('#f-p').inputValue() === '', 'backup passphrase input clears immediately after use');
+  check(await page.evaluate(() => { const key = document.getElementById('dlg-status').textContent.slice('Backup key: '.length); return !Object.values(localStorage).some((value) => value.includes(key)); }), 'revealed key is not saved in browser storage or logs');
+  await page.clock.fastForward(45_001);
+  check(!(await page.locator('#dlg-status').textContent()).startsWith('Backup key: '), 'backup key hides after 45 seconds');
+  check(await page.locator('#dlg-go').isVisible(), 'existing Show action asks for the passphrase again');
+  await close();
+  await reveal(); await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  check(!(await page.locator('#dlg-status').textContent()).startsWith('Backup key: '), 'leaving focus hides the revealed key');
+  await close();
+  await backupButton(); await page.locator('#f-p').fill(phrase);
+  await page.evaluate(() => { document.getElementById('dlg-go').click(); window.dispatchEvent(new Event('blur')); });
+  // Let WebCrypto complete without advancing five minutes or starting the trader.
+  await page.waitForTimeout(600);
+  check(!(await page.locator('#dlg-status').textContent()).startsWith('Backup key: '), 'a pending reveal cannot reshow its key after focus was lost');
+  await close();
+  await page.evaluate(async () => { const { state } = await import('/js/store.js'); state.mode = 'live'; state.wasRunning = false; state.backedUp = true; const why = await (await import('/js/impi.js')).start(); if (why) throw new Error(why); });
+  await waitIdle();
+  check(await page.evaluate(async () => { const { vault, checkWalletIdle } = await import('/js/wallet.js'); checkWalletIdle(Date.now() + 300_001); return vault.unlocked; }), 'idle lock preserves the real running Live trader');
+  await page.evaluate(async () => (await import('/js/impi.js')).stop());
+  await waitIdle();
+  const idleChecks = await page.evaluate(async () => {
+    const { vault, checkWalletIdle } = await import('/js/wallet.js'), { state, lock } = await import('/js/store.js');
+    const future = () => Date.now() + 300_001, result = {};
+    state.positions = [{ mode: 'live' }]; checkWalletIdle(future()); result.position = vault.unlocked;
+    state.positions = []; state.orders = [{ mode: 'live', status: 'waiting' }]; checkWalletIdle(future()); result.order = vault.unlocked;
+    state.orders = []; lock.busy = true; checkWalletIdle(future()); result.pending = vault.unlocked;
+    lock.busy = false; state.wasRunning = true; checkWalletIdle(future()); result.locked = !vault.unlocked; // a saved flag is not an active local trader
+    state.mode = 'paper'; return result;
+  });
+  for (const [name, ok] of Object.entries(idleChecks)) check(ok, `idle key handling: ${name}`);
+  const lateUnlock = await page.evaluate(async (phrase) => {
+    const { vault } = await import('/js/wallet.js');
+    const result = vault.unlock(phrase).then(() => false, () => true);
+    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+    return await result && !vault.unlocked;
+  }, phrase);
+  check(lateUnlock, 'page exit cancels pending unlock instead of resurrecting a key');
+  await page.evaluate(async (phrase) => { const { vault } = await import('/js/wallet.js'); await vault.unlock(phrase); window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })); }, phrase);
+  check(await page.evaluate(async () => !(await import('/js/wallet.js')).vault.unlocked), 'page exit locks an unlocked wallet, including back-forward cache');
   check(errors.length === 0, `no browser errors: ${errors.join('; ')}`);
   console.log(`PASS: ${checks} local browser checks; no real wallets, transfers or API calls.`);
   await context.close();

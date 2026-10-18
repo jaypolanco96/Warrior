@@ -152,19 +152,46 @@ on('running', () => { state.wasRunning = impi.running; save(); drawControls(); }
 
 // ---------- the trading wallet panel and its small dialog ----------
 const dlg = $('dlg');
-let dialogVersion = 0;
+let dialogVersion = 0, backupTimer = 0, backupDialog = null;
+function clearSecretInputs() { for (const i of dlg.querySelectorAll('input[type=password]')) i.value = ''; }
+function hideBackup() {
+  clearSecretInputs();
+  if (!backupDialog || !dlg.open) return;
+  const config = backupDialog; ask(config);
+  $('dlg-status').textContent = 'Backup key hidden. Enter your passphrase again to show it.';
+}
+window.addEventListener('blur', hideBackup);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') hideBackup(); });
+window.addEventListener('pagehide', hideBackup);
+on('vault-locked', hideBackup);
 $('dlg-close').addEventListener('click', () => dlg.close());
-dlg.addEventListener('close', () => { if (dlg.open) return; dialogVersion++; $('dlg-body').replaceChildren(); $('dlg-status').textContent = ''; $('dlg-go').onclick = null; });
-function ask({ title, text, fields = [], action, run }) {
+dlg.addEventListener('close', () => { if (dlg.open) return; dialogVersion++; clearTimeout(backupTimer); backupDialog = null; clearSecretInputs(); $('dlg-body').replaceChildren(); $('dlg-status').textContent = ''; $('dlg-go').onclick = null; });
+function ask(config) {
+  const { title, text, fields = [], action, run, sensitive = false } = config;
+  clearTimeout(backupTimer); backupDialog = sensitive ? config : null;
+  $('dlg-status').setAttribute('aria-live', sensitive ? 'off' : 'polite');
   const version = ++dialogVersion;
   $('dlg-title').textContent = title; const body = $('dlg-body'); body.replaceChildren(el('p', 'small', text)); $('dlg-status').textContent = '';
-  const inputs = {}; for (const f of fields) { const wrap = el('div', 'field'), l = el('label', '', f.label), i = el('input'); i.type = f.type ?? 'password'; i.autocomplete = f.ac ?? (i.type === 'password' ? 'current-password' : 'off'); if (i.type === 'password') i.name = 'password'; if (i.type === 'number') { i.step = 'any'; i.min = '0.000000001'; i.inputMode = 'decimal'; } i.id = `f-${f.id}`; l.htmlFor = i.id; wrap.append(l, i); body.append(wrap); inputs[f.id] = i; }
+  const inputs = {}; for (const f of fields) { const wrap = el('div', 'field'), l = el('label', '', f.label), i = el('input'); i.type = f.type ?? 'password'; i.autocomplete = f.ac ?? (i.type === 'password' ? 'current-password' : 'off'); if (i.type === 'password') { i.name = f.id === 'k' ? 'backup-key' : 'password'; i.spellcheck = false; i.autocapitalize = 'none'; i.setAttribute('autocorrect', 'off'); } if (i.type === 'number') { i.step = 'any'; i.min = '0.000000001'; i.inputMode = 'decimal'; } i.id = `f-${f.id}`; l.htmlFor = i.id; wrap.append(l, i); body.append(wrap); inputs[f.id] = i; }
   // A hidden username lets the browser's password manager save and fill the passphrase for this one wallet.
   if (fields.some((f) => (f.type ?? 'password') === 'password')) { const u = el('input'); u.type = 'text'; u.name = 'username'; u.autocomplete = 'username'; u.value = 'Warrior trading wallet'; u.hidden = true; body.prepend(u); }
   for (const i of Object.values(inputs)) i.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('dlg-go').click(); } });
   const go = $('dlg-go'); go.textContent = action; go.hidden = !action; go.disabled = false;
-  go.onclick = async () => { go.disabled = true; $('dlg-status').textContent = 'Working…'; try { const out = await run(Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.value]))); if (version === dialogVersion && dlg.open) { if (typeof out === 'string') { $('dlg-status').textContent = out; go.hidden = true; } else dlg.close(); } drawWallet(); void drawMoney(); } catch (e) { if (version === dialogVersion && dlg.open) { $('dlg-status').textContent = e.message; go.disabled = false; } } };
-  dlg.showModal();
+  go.onclick = async () => {
+    const values = Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.value]));
+    for (const i of Object.values(inputs)) if (i.type === 'password') i.value = '';
+    go.disabled = true; $('dlg-status').textContent = 'Working...';
+    try {
+      const out = await run(values);
+      if (version === dialogVersion && dlg.open) {
+        if (typeof out === 'string') { $('dlg-status').textContent = out; go.hidden = true; if (sensitive) { state.backedUp = true; save(); backupTimer = setTimeout(hideBackup, 45_000); } }
+        else dlg.close();
+      }
+      drawWallet(); void drawMoney();
+    } catch (e) { if (version === dialogVersion && dlg.open) { $('dlg-status').textContent = e.message; go.disabled = false; } }
+    finally { for (const [id, i] of Object.entries(inputs)) if (i.type === 'password') values[id] = ''; }
+  };
+  if (!dlg.open) dlg.showModal();
 }
 // Money you move in or out of the live wallet is not a gain or a loss: the day's starting equity moves with it, so a
 // withdrawal never trips the daily loss limit and a deposit never hides a real loss.
@@ -179,8 +206,8 @@ async function drawWallet() {
   if (!vault.exists) {
     box.append(el('p', 'warn', 'Your trading wallet is locked with a passphrase you choose. It works on every phone and browser you open Warrior on: make it once here, then use "Open my wallet from another device" with the same passphrase. Lose the passphrase and the backup key, and the wallet is gone. Keep only money you can lose in it.'));
     const row = el('div', 'row'), make = el('button', 'btn', 'Make my trading wallet'), rest = el('button', 'btn ghost', 'Restore from a backup key'); make.type = rest.type = 'button';
-    make.addEventListener('click', () => ask({ title: 'Make your trading wallet', text: 'Choose a passphrase of 10+ characters (a few random words work well). It locks the wallet, and it is how you open the same wallet on your other devices.', fields: [{ id: 'p', label: 'PASSPHRASE', ac: 'new-password' }, { id: 'a', label: 'AGAIN', ac: 'new-password' }], action: 'Make wallet', run: async (v) => { vault.checkPassphrase(v.p, v.a); await vault.create(v.p); state.backedUp = false; save(); } }));
-    rest.addEventListener('click', () => ask({ title: 'Restore a trading wallet', text: 'Paste the backup key (from Warrior or exported from Phantom) and choose a passphrase.', fields: [{ id: 'k', label: 'BACKUP KEY', type: 'text' }, { id: 'p', label: 'PASSPHRASE' }, { id: 'a', label: 'AGAIN' }], action: 'Restore', run: async (v) => { vault.checkPassphrase(v.p, v.a); await vault.restore(v.k.trim(), v.p); state.backedUp = true; save(); } }));
+    make.addEventListener('click', () => ask({ title: 'Make your trading wallet', text: 'Choose a unique passphrase of 15+ characters (four or more random words work well). It locks the wallet, and it is how you open the same wallet on your other devices.', fields: [{ id: 'p', label: 'PASSPHRASE', ac: 'new-password' }, { id: 'a', label: 'AGAIN', ac: 'new-password' }], action: 'Make wallet', run: async (v) => { vault.checkPassphrase(v.p, v.a); await vault.create(v.p); state.backedUp = false; save(); } }));
+    rest.addEventListener('click', () => ask({ title: 'Restore a trading wallet', text: 'Paste the backup key (from Warrior or exported from Phantom) and choose a passphrase.', fields: [{ id: 'k', label: 'BACKUP KEY', type: 'password', ac: 'off' }, { id: 'p', label: 'PASSPHRASE' }, { id: 'a', label: 'AGAIN' }], action: 'Restore', run: async (v) => { vault.checkPassphrase(v.p, v.a); await vault.restore(v.k.trim(), v.p); state.backedUp = true; save(); } }));
     const other = el('button', 'btn ghost', 'Open my wallet from another device'); other.type = 'button';
     other.addEventListener('click', () => ask({ title: 'Open your wallet from another device', text: 'Type the passphrase of the trading wallet you made on your other phone or computer. Warrior finds the locked copy that device synced and opens it here. Your passphrase never leaves this device; only an id made from it is sent.', fields: [{ id: 'p', label: 'PASSPHRASE' }], action: 'Find and open', run: async (v) => { await vault.fromOtherDevice(v.p); state.backedUp = true; save(); } }));
     row.append(make, rest, other); box.append(row, syncLine()); return;
@@ -193,11 +220,11 @@ async function drawWallet() {
   const row = el('div', 'row'), add = (label, ghost, fn) => { const b = el('button', `btn ${ghost ? 'ghost' : ''}`, label); b.type = 'button'; b.addEventListener('click', fn); row.append(b); };
   if (!vault.unlocked && vault.hasPasskey) add('Unlock with passkey', false, async () => { try { await vault.unlockDevice(); } catch (e) { emit('say', { who: 'induna', text: `${e?.name === 'NotAllowedError' ? 'The passkey prompt was cancelled' : e.message}. The passphrase still works.`, tone: 'down' }); } });
   if (vault.unlocked && !vault.hasPasskey && vault.passkeySupported) add('Add a passkey (fingerprint or face)', true, async () => { try { await vault.addPasskey(); emit('say', { who: 'induna', text: 'Passkey added: this device can unlock the wallet with your fingerprint, face or PIN. The passphrase still works.' }); } catch (e) { emit('say', { who: 'induna', text: `${e?.name === 'NotAllowedError' ? 'Passkey not added: the prompt was cancelled' : e.message}.`, tone: 'down' }); } });
-  if (!vault.unlocked) add(vault.hasPasskey ? 'Unlock with passphrase' : 'Unlock', !!vault.hasPasskey, () => ask({ title: 'Unlock the trading wallet', text: 'It stays unlocked in this tab until you lock it or close the tab.', fields: [{ id: 'p', label: 'PASSPHRASE' }], action: 'Unlock', run: (v) => vault.unlock(v.p) }));
+  if (!vault.unlocked) add(vault.hasPasskey ? 'Unlock with passphrase' : 'Unlock', !!vault.hasPasskey, () => ask({ title: 'Unlock the trading wallet', text: 'It locks after five idle minutes when no live trading, positions or orders need it. Leaving the page locks it too.', fields: [{ id: 'p', label: 'PASSPHRASE' }], action: 'Unlock', run: (v) => vault.unlock(v.p) }));
   else add('Lock', true, () => { vault.lock(); });
   add('Fund from Phantom', false, () => ask({ title: 'Send SOL from Phantom', text: owner.address ? 'Phantom will show the amount and ask you to approve.' : 'Connect Phantom first (top right).', fields: owner.address ? [{ id: 's', label: 'SOL TO SEND', type: 'number' }] : [], action: owner.address ? 'Send' : '', run: async (v) => { const r = await exclusive(() => fundFromPhantom(Number(v.s))); if (r.outcome === 'confirmed') moved(Number(v.s)); return transferMessage(r, 'Sent. It is in the trading wallet.'); } }));
   if (vault.unlocked) add('Send to Phantom', true, () => ask({ title: 'Send SOL back', text: `To ${owner.address ? 'your connected Phantom' : 'the address below'}. Keep about 0.01 SOL for fees.`, fields: [{ id: 's', label: 'SOL TO SEND', type: 'number' }, ...(owner.address ? [] : [{ id: 'to', label: 'TO ADDRESS', type: 'text' }])], action: 'Send', run: async (v) => { const r = await exclusive(() => withdraw(owner.address || v.to.trim(), Number(v.s))); if (r.outcome === 'confirmed') moved(-Number(v.s)); return transferMessage(r, 'Sent.'); } }));
-  add(state.backedUp ? 'Backup key' : 'Save the backup key (needed for live)', !!state.backedUp, () => ask({ title: 'Your backup key', text: 'Type the passphrase to show it. Anyone with this key controls the wallet: never paste it into a website or chat.', fields: [{ id: 'p', label: 'PASSPHRASE' }], action: 'Show', run: async (v) => { const k = await vault.backup(v.p); state.backedUp = true; save(); return `Backup key: ${k}`; } }));
+  add(state.backedUp ? 'Backup key' : 'Save the backup key (needed for live)', !!state.backedUp, () => ask({ title: 'Your backup key', sensitive: true, text: 'Type the passphrase to show it. It hides after 45 seconds or when you leave this page. Anyone with this key controls the wallet: never paste it into a website or chat.', fields: [{ id: 'p', label: 'PASSPHRASE' }], action: 'Show', run: async (v) => { const k = await vault.backup(v.p); return `Backup key: ${k}`; } }));
   box.append(row, syncLine());
 }
 function syncLine() { const p = el('p', 'small sync-line', sync.note); p.id = 'sync-status'; return p; }
@@ -244,7 +271,7 @@ on('synced', drawCare); on('wallet', drawCare); drawCare();
 
 // ---------- the honest receipt (from Laugh) ----------
 export function showReceipt(t) {
-  dialogVersion++; $('dlg-go').onclick = null;
+  dialogVersion++; clearTimeout(backupTimer); backupDialog = null; $('dlg-go').onclick = null;
   const r = receipt(t), body = $('dlg-body'), table = el('div', 'receipt');
   $('dlg-title').textContent = 'Honest receipt';
   const meta = el('p', 'small', `${t.symbol} · closed ${new Date(t.closedAt).toLocaleString()} · ${t.reason}${t.partial ? ' (part)' : ''} · rules ${t.rules ?? '—'} · ${t.mode === 'live' ? 'live' : 'practice'}`);

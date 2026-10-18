@@ -3,7 +3,7 @@
 // back what changed. Only one device at a time may run the auto trader; it claims a three-minute lease and renews it.
 import { vault } from './wallet.js';
 import { on, emit } from './store.js';
-import { SYNC_KEYS, TRADER_KEY, sealSnapshot, openSnapshot, mergeSnapshots, signedText, digestOf } from '/vendor/lib/sync.js';
+import { SYNC_KEYS, TRADER_KEY, mergeSnapshots, signedText, digestOf } from '/vendor/lib/sync.js';
 
 const BASE = 'warrior.sync.base.v1', DEVICE = 'warrior.sync.device.v1', SENT = 'warrior.sync.sent.v1', $ = (id) => document.getElementById(id);
 const read = (k) => { try { return localStorage.getItem(k); } catch { return null; } }, write = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
@@ -19,11 +19,12 @@ function show(text) { note = text; const el = $('sync-status'); if (el) el.textC
 
 async function sendRecord() {
   const id = vault.syncId, rec = vault.portable; if (!id || !rec || read(SENT) === `${id}:${rec.address}`) return;
-  const ts = Date.now(), r = await call({ op: 'record', id, record: rec, ts, sig: vault.sign(signedText.record({ id, address: rec.address, ts })) });
+  const digest = await digestOf(JSON.stringify(rec)), ts = Date.now(), r = await call({ op: 'record', id, record: rec, ts, sig: vault.sign(signedText.record({ id, address: rec.address, digest, ts })) });
   if (r.status === 200) write(SENT, `${id}:${rec.address}`);
+  else if (!(r.status === 503 && r.setup)) throw new Error(r.error ?? 'The encrypted wallet backup could not sync');
 }
 async function push(address, snap, from) {
-  const blob = await sealSnapshot(vault.syncKey, address, snap), ts = Date.now(), baseText = String(from);
+  const blob = await vault.sealSnapshot(snap), ts = Date.now(), baseText = String(from);
   const r = await call({ op: 'put', address, base: baseText, blob, ts, sig: vault.sign(signedText.put({ address, base: baseText, digest: await digestOf(blob), ts })) });
   if (r.status === 200) { base = { address, version: r.version, snap }; write(BASE, JSON.stringify(base)); return true; }
   if (r.status === 409) return false; // someone else saved first: the next round merges their copy
@@ -35,7 +36,7 @@ const holds = [];
 /** `ok()` returns false while incoming trader data must wait (the auto trader is in the middle of a buy or sell). */
 export const holdWhile = (ok) => holds.push(ok);
 export async function syncNow() {
-  if (off || !vault.unlocked || !vault.protected || !vault.syncKey) return;
+  if (off || !vault.unlocked || !vault.protected) return;
   if (running) { pending = true; return running; } // asked during a round: run once more right after it
   running = (async () => {
     busy = true;
@@ -54,7 +55,7 @@ async function round() {
     if (r.status !== 200) throw new Error(r.error ?? 'Sync unavailable');
     let local = snapshot();
     if (r.version && r.version !== base?.version) {
-      const remote = await openSnapshot(vault.syncKey, address, r.blob), { merged, take } = mergeSnapshots(base?.snap ?? {}, local, remote, { authority });
+      const remote = await vault.openSnapshot(r.blob), { merged, take } = mergeSnapshots(base?.snap ?? {}, local, remote, { authority });
       // Never swap the trader's positions out from under a buy or sell in progress: try again next round.
       if (take.includes(TRADER_KEY) && holds.some((ok) => !ok())) return 'done';
       for (const k of take) write(k, merged[k]);

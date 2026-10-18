@@ -6,7 +6,7 @@ import { state, save, api, emit, on, lock, dials, problem, notify } from './stor
 import { claimTrading, releaseTrading, holdWhile } from './sync.js';
 import { buy, watch, balance, heldSol, live, sellable, sell } from './trader.js';
 import { bedtimeState } from '/vendor/lib/mood.js';
-import { vault } from './wallet.js';
+import { vault, holdWalletWhile } from './wallet.js';
 import { fire } from './net.js';
 import { shadowRound } from './shadow.js';
 import { weatherFactor, weather } from './watch.js';
@@ -22,6 +22,7 @@ export const AGENTS = [
 export const rules = () => resolveRules({ preset: state.preset, adapt: dials() });
 const heard = {};
 let running = false, starting = false, timer = 0, watcher = 0, last = null, nextAt = 0, rounds = 0, ms = 0;
+holdWalletWhile(() => live() && (running || starting));
 export const impi = { get running() { return running; }, get starting() { return starting; }, get lastScan() { return last; }, get nextAt() { return nextAt; }, get rounds() { return rounds; }, get scanMs() { return ms; } };
 const say = (who, text, tone) => emit('say', { who, text, tone });
 on('say', ({ who }) => fire(who));
@@ -128,5 +129,6 @@ on('trade', ({ side } = {}) => {
   const n = losingStreak(); if (n >= limit) { notify('pause', 'Warrior paused', `${n} losing trades in a row. Open positions keep their stops; send the impi out again when you are ready.`, 0); say('induna', `${n} losing trades in a row: the impi is pausing, as you asked. Open positions keep their stops. Look at the scorecard, then send it out again when you are ready.`, 'down'); stop(); }
 });
 export function stop() { running = false; nextAt = 0; clearInterval(timer); clearInterval(watcher); void releaseTrading(); releaseTab?.(); releaseTab = null; try { wake?.release(); } catch { /* already gone */ } wake = null; say('induna', 'The impi is resting. Open positions are still yours; start again to keep watching them.'); emit('running'); }
+on('vault-locked', () => { if (live() && running) { stop(); say('induna', 'The trading wallet is locked. Live trading is paused; unlock it and send the impi again to watch your positions.', 'down'); } });
 /** A look without trading, so the dashboard is alive before the impi is sent. */
 export async function peek() { try { const t0 = performance.now(), scan = await api(`/api/scan?${toQuery({ preset: state.preset, adapt: dials() })}`); ms = performance.now() - t0; last = scan; emit('scan', scan); } catch { /* shown next time */ } }

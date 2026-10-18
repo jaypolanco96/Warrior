@@ -40,7 +40,7 @@ async function swap(quoteResponse, exit) {
   if (tx.message.staticAccountKeys[0].toBase58() !== vault.address || tx.message.header.numRequiredSignatures !== 1) throw new Error('swap was not built for this wallet');
   const keys = tx.message.staticAccountKeys.map((k) => k.toBase58()), odd = unexpectedPrograms(tx.message.compiledInstructions.map((i) => keys[i.programIdIndex] ?? 'unknown'));
   if (odd.length) throw new Error(`swap refused: it calls a program Warrior does not expect (${odd[0].slice(0, 8)}…)`);
-  tx.sign([vault.keypair]);
+  vault.signTransaction(tx);
   const { signature } = await post('/api/send', { transaction: b64(tx.serialize()) }); return { signature, outcome: await waitFor(signature) };
 }
 
@@ -131,8 +131,8 @@ async function sweep() {
   const w = state.sweep; if (!w?.on || !vault.unlocked) return;
   try {
     const lamports = sweepLamports({ balanceLamports: Math.round((await liveBalance()) * 1e9), keepSol: w.keepSol, openPositions: sellable().length, on: w.on, to: w.to }); if (!lamports) return;
-    const { blockhash } = await api('/api/chain'), tx = new Transaction({ feePayer: vault.keypair.publicKey, recentBlockhash: blockhash }).add(SystemProgram.transfer({ fromPubkey: vault.keypair.publicKey, toPubkey: new PublicKey(w.to), lamports }));
-    tx.sign(vault.keypair); const { signature } = await post('/api/send', { transaction: b64(tx.serialize()) }), outcome = await waitFor(signature);
+    const { blockhash } = await api('/api/chain'), tx = new Transaction({ feePayer: vault.publicKey, recentBlockhash: blockhash }).add(SystemProgram.transfer({ fromPubkey: vault.publicKey, toPubkey: new PublicKey(w.to), lamports }));
+    vault.signTransaction(tx); const { signature } = await post('/api/send', { transaction: b64(tx.serialize()) }), outcome = await waitFor(signature);
     if (outcome === 'confirmed') { const d = state.days?.live; if (d && Number.isFinite(d.start)) d.start = Math.max(0, d.start - lamports / 1e9); save(); }
     say('umlobi', outcome === 'confirmed' ? `Swept ${(lamports / 1e9).toFixed(4)} SOL to your address, keeping ${w.keepSol} SOL to trade.` : `Sweep ${outcome}. Not resending; check the wallet.`, outcome === 'confirmed' ? 'up' : 'down');
   } catch (e) { say('umlobi', `Sweep did not run (${e.message}). Nothing was sent.`, 'down'); }
@@ -171,9 +171,9 @@ export async function watch(rules) {
 async function reclaim(mint) {
   try {
     const info = await api(`/api/balance?owner=${vault.address}&empty=1`), list = closableAccounts(info.emptyAccounts, { mint }); if (!list.length) return 0;
-    const start = await liveBalance(), { blockhash } = await api('/api/chain'), me = vault.keypair.publicKey, tx = new Transaction({ feePayer: me, recentBlockhash: blockhash });
+    const start = await liveBalance(), { blockhash } = await api('/api/chain'), me = vault.publicKey, tx = new Transaction({ feePayer: me, recentBlockhash: blockhash });
     for (const a of list) tx.add(new TransactionInstruction({ programId: new PublicKey(a.program), keys: [{ pubkey: new PublicKey(a.address), isSigner: false, isWritable: true }, { pubkey: me, isSigner: false, isWritable: true }, { pubkey: me, isSigner: true, isWritable: false }], data: CLOSE_ACCOUNT_DATA }));
-    tx.sign(vault.keypair); const { signature } = await post('/api/send', { transaction: b64(tx.serialize()) });
+    vault.signTransaction(tx); const { signature } = await post('/api/send', { transaction: b64(tx.serialize()) });
     if (await waitFor(signature) !== 'confirmed') return 0;
     return Math.max(0, await liveBalance() - start);
   } catch { return 0; } // the rent stays claimable later

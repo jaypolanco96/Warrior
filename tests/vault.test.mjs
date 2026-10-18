@@ -35,7 +35,7 @@ test('a device passkey is a second way in, and the wrong one is refused', async 
 });
 
 test('passphrase rules are plain: long enough, not repetitive, not famous', () => {
-  assert.deepEqual(passphraseProblems('correct horse battery'), []); assert.deepEqual(passphraseProblems('Tr0ub4dor&3x'), []);
+  assert.deepEqual(passphraseProblems('correct horse battery'), []); assert.deepEqual(passphraseProblems('Tr0ub4dor&3x-unique'), []);
   assert.equal(passphraseProblems('short').length, 1); assert.equal(passphraseProblems('aaaaaaaaaaaa').length, 1); assert.equal(passphraseProblems('1234567890').length, 1); assert.equal(passphraseProblems(null).length, 1);
 });
 
