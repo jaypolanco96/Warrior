@@ -10,7 +10,7 @@ test('buying on a dip: an RSI limit and a stretch limit, both off unless you set
   assert.ok(held.reasons.some((r) => /Stretched: .* waiting for a dip/.test(r))); assert.equal(held.decision, 'wait');
   assert.ok(cool.reasons.some((r) => /above your limit of 55/.test(r)));
   assert.equal(defaultSettings.maxEntryRsi, 78); assert.equal(defaultSettings.maxStretchPct, 0);
-  assert.equal(resolveRules({ preset: 'balanced' }).version, 'balanced-43dac0', 'the Balanced preset\'s version');
+  assert.equal(resolveRules({ preset: 'balanced' }).version, 'balanced-f70eb3', 'the Balanced preset\'s version');
   assert.equal(resolveRules({ preset: 'balanced' }).settings.maxEntryRsi, 50); assert.equal(resolveRules({ preset: 'balanced' }).settings.maxStretchPct, 1);
   const { validateSettings } = await import('../lib/strategy.mjs');
   for (const bad of [{ maxEntryRsi: 30 }, { maxEntryRsi: 95 }, { maxStretchPct: 0.2 }, { maxStretchPct: 40 }]) assert.throws(() => validateSettings(bad), JSON.stringify(bad));

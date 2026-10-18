@@ -83,6 +83,42 @@ try {
   check(startingResult.mode === 'paper' && startingResult.why === null, 'mode cannot change while the impi is acquiring its trading lock');
   await waitIdle();
 
+  const learning = await page.evaluate(async () => {
+    const { state, dials, emit } = await import('/js/store.js');
+    const { adaptationBook } = await import('/vendor/lib/adapt.js');
+    const { evidence } = await import('/js/adapt.js');
+    const { weather, missedByRule } = await import('/js/watch.js');
+    const saved = { adapt: state.adapt, watch: state.watch, mode: state.mode, trades: state.trades };
+    try {
+      state.adapt = { mode: 'off' }; state.watch = {}; state.trades = []; state.mode = 'paper';
+      const paper = adaptationBook(state); paper.dials.holdHours = 5;
+      paper.probation = { key: 'holdHours', from: 3, to: 5, at: Date.now() };
+      state.mode = 'live'; emit('mode'); const liveDials = { ...dials() }, liveProbation = adaptationBook(state).probation;
+      state.watch.after = Array.from({ length: 8 }, (_, i) => ({ done: true, mode: 'live', preset: 'balanced', reason: 'time', rules: 'old-rules', at: Date.now()-i*1000, afterMax: 20, afterEnd: 8 }));
+      const staleMove = evidence().some(m => m.key === 'holdHours');
+      const { resolveRules } = await import('/vendor/lib/presets.js');
+      for (const x of state.watch.after) x.rules = resolveRules({ preset: 'balanced' }).version;
+      const freshMove = evidence().find(m => m.key === 'holdHours')?.to;
+      state.watch.dips = Array.from({ length: 6 }, () => ({ done: true, mode: 'paper', preset: 'balanced', at: Date.now(), bounced: false }));
+      const liveWeather = weather();
+      const mint = 'synthetic-learning';
+      state.mode = 'paper'; emit('missed', { mint, symbol: 'LEARN', price: 2, rule: 'depth', gap: 1 });
+      state.mode = 'live'; emit('missed', { mint, symbol: 'LEARN', price: 2, rule: 'depth', gap: 1 });
+      const recorded = state.watch.missed.map(x => ({ mode: x.mode, rules: x.rules }));
+      for (const x of state.watch.missed) { x.done = true; x.result = 4; }
+      const legacyReports = missedByRule();
+      state.mode = 'paper'; const paperDials = { ...dials() };
+      return { liveDials, liveProbation, staleMove, freshMove, liveWeather, recorded, paperDials, reported: legacyReports.depth?.n };
+    } finally { Object.assign(state, saved); emit('mode'); }
+  });
+  check(Object.keys(learning.liveDials).length === 0 && learning.liveProbation === null, 'practice moves and probation cannot govern live');
+  check(learning.paperDials.holdHours === 5, 'switching back retains practice learning');
+  check(!learning.staleMove, 'old-rule follow-up prices cannot move current live dials');
+  check(learning.freshMove === 5, 'fresh current-rule live evidence still permits a bounded move');
+  check(learning.liveWeather.n === 0, 'practice dip outcomes cannot block live exposure');
+  check(learning.recorded.length === 2 && learning.recorded.every(x => x.rules), 'both modes record independently with rule provenance');
+  check(learning.reported === 1, 'mode-filtered watch reports remain available');
+
   await page.evaluate(async () => {
     const { emit } = await import('/js/store.js');
     emit('scan', { universe: 3, scanned: 1, results: [{ symbol: 'MATURE', marketType: 'mature', volume1hUsd: 1000000, change: { m5: -2, h1: -5 }, analysis: { decision: 'wait' } }], activity: { matureIncluded: true, sourcesFailed: 1, groups: [{ label: 'Mature', coins: 2, selected: 1, sharePct: 75 }, { label: 'Rocket launches', coins: 1, selected: 0, sharePct: 25 }] } });

@@ -18,7 +18,7 @@ export function save() {
   try { localStorage.removeItem(OLD); localStorage.setItem(KEY, JSON.stringify({ ...state, trades: state.trades.slice(-500), equity: state.equity.slice(-2000), log: state.log.slice(-200) })); } catch { /* storage full or blocked: keep going in memory */ }
 }
 /** The self-ruling moves in force for a strength (see adapt.js); {} when none. */
-export const dials = (preset = state.preset) => state.adapt?.[preset]?.dials ?? {};
+export const dials = (preset = state.preset) => state.adapt?.books?.[state.mode]?.[preset]?.dials ?? {};
 /** A problem worth knowing about: said in the live feed (and as an alert, if alerts are on), at most once per `everyMs` per kind. */
 const lastProblem = {};
 export function problem(key, text, everyMs = 600_000) { if (Date.now() - (lastProblem[key] ?? 0) < everyMs) return; lastProblem[key] = Date.now(); emit('say', { who: 'umlobi', text, tone: 'down' }); emit('alert', { title: 'Warrior: something needs a look', body: text }); }

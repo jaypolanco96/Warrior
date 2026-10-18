@@ -8,7 +8,7 @@
 // Evidence comes from the trade history and the watchtower (watch.js). Everything is written to the history below.
 import { state, save, emit, on } from './store.js';
 import { ADAPT, resolveRules } from '/vendor/lib/presets.js';
-import { evidence as decide, judge as verdictOf, baselineOf, perDayOf, MIN_GAP_MS } from '/vendor/lib/adapt.js';
+import { evidence as decide, judge as verdictOf, baselineOf, perDayOf, MIN_GAP_MS, adaptationBook } from '/vendor/lib/adapt.js';
 import { afterByReason, missedByRule } from './watch.js';
 
 const H = 3_600_000, DAY = 24 * H, $ = (id) => document.getElementById(id);
@@ -18,7 +18,7 @@ const avg = (l, f) => l.length ? l.reduce((a, x) => a + f(x), 0) / l.length : 0;
 const SHORT = { holdHours: 'Sell after', targetPct: 'Target', dipBelowPct: 'Dip depth', lossCooldownMinutes: 'Re-buy wait after a loss' };
 const UNITS = { holdHours: (v) => `${v} h`, targetPct: (v) => `+${v}%`, dipBelowPct: (v) => `${v}%`, lossCooldownMinutes: (v) => `${v / 60} h` };
 
-function book(preset = state.preset) { state.adapt ??= { mode: 'auto' }; state.adapt[preset] ??= { dials: {}, history: [], last: 0, probation: null, locked: {}, proposal: null }; return state.adapt[preset]; }
+function book(preset = state.preset) { return adaptationBook(state, preset); }
 const presetOf = (t) => t.preset ?? String(t.rules ?? '').split(/[-+~]/)[0];
 const value = (preset, key) => { const r = resolveRules({ preset, adapt: book(preset).dials }); return ADAPT[key].of === 'settings' ? r.settings[key] : r.risk[key]; };
 
@@ -36,7 +36,9 @@ export function positions(preset = state.preset, since = Date.now() - 14 * DAY) 
 
 /** What the evidence says right now (lib/adapt.mjs decides; this only gathers the inputs). */
 export function evidence(preset = state.preset) {
-  return decide({ positions: positions(preset), after: afterByReason(preset), missed: missedByRule(preset), value: (k) => value(preset, k) });
+  const rules = resolveRules({ preset, adapt: book(preset).dials }).version;
+  const cohort = { rules, since: Date.now() - 14 * DAY };
+  return decide({ positions: positions(preset).filter(p => p.rules === rules), after: afterByReason(preset, cohort), missed: missedByRule(preset, cohort), value: (k) => value(preset, k) });
 }
 
 function record(b, entry) { b.history.push({ at: Date.now(), ...entry }); while (b.history.length > 60) b.history.shift(); }
@@ -82,12 +84,13 @@ export function draw() {
   for (const [k, d] of Object.entries(ADAPT)) { const b0 = d.of === 'settings' ? base.settings[k] : base.risk[k], now = value(preset, k), tr = el('tr', now !== b0 ? 'moved' : '');
     tr.append(el('td', '', SHORT[k]), el('td', '', UNITS[k](b0)), el('td', '', `${UNITS[k](now)}${b.probation?.key === k ? ' · probation' : (b.locked[k] ?? 0) > Date.now() ? ' · resting' : ''}`), el('td', 'small', `${UNITS[k](d.min)}–${UNITS[k](d.max)}`)); t.tBodies[0].append(tr); }
   const parts = [top, t];
+  if (book(preset).archivedUnscoped) parts.push(el('p', 'small', 'Earlier learning had no practice/live label. Its history is archived below; this mode starts from the tested defaults and learns separately.'));
   if (b.proposal && mode === 'suggest') { const p = b.proposal, card = el('div', 'proposal'), go = el('button', 'btn small', 'Apply'), no = el('button', 'btn ghost small', 'Not now'); go.type = no.type = 'button';
     go.addEventListener('click', () => apply(preset, p, 'you')); no.addEventListener('click', () => { b.proposal = null; b.last = Date.now(); save(); draw(); });
     const row = el('div', 'row'); row.append(go, no); card.append(el('b', '', `${p.key === 'lossCooldownMinutes' ? 'Re-buy wait' : ADAPT[p.key].label}: ${UNITS[p.key](p.from)} → ${UNITS[p.key](p.to)}`), el('p', 'small', p.why), row); parts.push(card); }
   const ev = evidence(preset), P = positions(preset);
   parts.push(el('p', 'small', ev.length ? `Evidence now points to ${ev.length} move${ev.length === 1 ? '' : 's'}.` : `${P.length} positions closed under ${preset} in the last 14 days. No dial has enough one-sided evidence to move: that is the usual answer, and a good one.`));
-  const hist = el('ol', 'ahist'); for (const h of [...b.history].reverse().slice(0, 6)) { const li = el('li', h.kind); li.append(el('span', 'small', new Date(h.at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })), el('b', '', `${h.kind === 'change' ? 'Moved' : h.kind === 'revert' ? 'Undone' : 'Kept'} · ${ADAPT[h.key]?.label ?? h.key} ${UNITS[h.key] ? `${UNITS[h.key](h.from)} → ${UNITS[h.key](h.to)}` : ''}`), el('span', '', h.why)); hist.append(li); }
+  const hist = el('ol', 'ahist'); for (const h of [...b.history].reverse().slice(0, 6)) { const li = el('li', h.kind); li.append(el('span', 'small', new Date(h.at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })), el('b', '', `${h.legacy ? 'Archived ? ' : ''}${h.kind === 'change' ? 'Moved' : h.kind === 'revert' ? 'Undone' : 'Kept'} · ${ADAPT[h.key]?.label ?? h.key} ${UNITS[h.key] ? `${UNITS[h.key](h.from)} → ${UNITS[h.key](h.to)}` : ''}`), el('span', '', h.why)); hist.append(li); }
   if (b.history.length) parts.push(el('h3', 'label sub', 'WHAT IT DID AND WHY'), hist);
   box.replaceChildren(...parts);
 }

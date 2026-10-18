@@ -3,8 +3,9 @@
 //  2. After the sale: every whole sale is followed for 3 hours. Did it sell too early, or just in time?
 //  3. Dip weather: of the coins that reached the deep-dip reading in the last 6 hours, how many bounced +5% within the hour?
 // Prices are sampled every 3 minutes, so highs and lows are approximate. The records are kept in the synced state.
-import { state, save, api, emit, on } from './store.js';
+import { state, save, api, emit, on, dials } from './store.js';
 import { resolveRules } from '/vendor/lib/presets.js';
+import { learningSample } from '/vendor/lib/adapt.js';
 
 const H = 3_600_000, FOLLOW = 3 * H, DIP_WINDOW = H, KEEP = 300;
 const $ = (id) => document.getElementById(id);
@@ -12,21 +13,21 @@ const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls)
 const pct = (v) => !Number.isFinite(v) ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
 function book() { state.watch ??= {}; const w = state.watch; w.missed ??= []; w.after ??= []; w.dips ??= []; w.guard ??= 'report'; return w; }
 const trim = (list) => { while (list.length > KEEP) list.shift(); };
-const fresh = (list, mint, within) => list.some((x) => x.mint === mint && Date.now() - x.at < within);
+const fresh = (list, mint, within) => list.some((x) => x.mint === mint && x.mode === state.mode && x.preset === state.preset && Date.now() - x.at < within);
 
 // ---------- recording ----------
 on('missed', ({ mint, symbol, price, rule, gap }) => {
   const w = book(); if (!Number.isFinite(price) || price <= 0 || fresh(w.missed, mint, FOLLOW)) return;
-  const s = resolveRules({ preset: state.preset }).settings;
-  w.missed.push({ mint, symbol, rule, gap: Number.isFinite(gap) ? gap : null, preset: state.preset, mode: state.mode, p0: price, at: Date.now(), max: price, min: price, last: price, stop: s.dipStopPct, target: s.targetPct, hit: null, done: false }); trim(w.missed); save();
+  const current = resolveRules({ preset: state.preset, adapt: dials() }), s = current.settings;
+  w.missed.push({ mint, symbol, rule, rules: current.version, gap: Number.isFinite(gap) ? gap : null, preset: state.preset, mode: state.mode, p0: price, at: Date.now(), max: price, min: price, last: price, stop: s.dipStopPct, target: s.targetPct, hit: null, done: false }); trim(w.missed); save();
 });
-on('trade', ({ side, mint, symbol, px, reason, whole, preset } = {}) => {
+on('trade', ({ side, mint, symbol, px, reason, whole, preset, rules, mode } = {}) => {
   if (side !== 'sell' || !whole || !Number.isFinite(px) || px <= 0) return;
-  const w = book(); w.after.push({ mint, symbol, reason, preset: preset ?? state.preset, mode: state.mode, p0: px, at: Date.now(), max: px, min: px, last: px, done: false }); trim(w.after); save();
+  const w = book(); w.after.push({ mint, symbol, reason, rules: rules ?? null, preset: preset ?? state.preset, mode: mode ?? state.mode, p0: px, at: Date.now(), max: px, min: px, last: px, done: false }); trim(w.after); save();
 });
 on('dip-seen', ({ mint, symbol, price }) => {
   const w = book(); if (fresh(w.dips, mint, DIP_WINDOW)) return;
-  w.dips.push({ mint, symbol, p0: price, at: Date.now(), max: price, done: false, bounced: null }); trim(w.dips); save();
+  w.dips.push({ mint, symbol, mode: state.mode, preset: state.preset, p0: price, at: Date.now(), max: price, done: false, bounced: null }); trim(w.dips); save();
 });
 
 // ---------- following the price ----------
@@ -51,7 +52,7 @@ setTimeout(follow, 20_000);
 
 // ---------- dip weather and the guard ----------
 export function weather() {
-  const since = Date.now() - 6 * H, seen = book().dips.filter((x) => x.done && x.at >= since), up = seen.filter((x) => x.bounced).length;
+  const since = Date.now() - 6 * H, seen = book().dips.filter((x) => x.done && x.at >= since && x.mode === state.mode && x.preset === state.preset), up = seen.filter((x) => x.bounced).length;
   const rate = seen.length ? up / seen.length : null;
   const level = seen.length < 5 ? 'unknown' : rate >= 0.5 ? 'good' : rate >= 0.35 ? 'mixed' : rate >= 0.2 ? 'storm' : 'severe';
   return { n: seen.length, up, rate, level };
@@ -61,12 +62,12 @@ export function weatherFactor() { if (book().guard !== 'auto') return 1; const {
 
 // ---------- summaries (also used by the self-ruling engine) ----------
 // Practice never teaches live, and the other way round: each summary reads only the current mode.
-export function missedByRule(preset = state.preset) {
-  const out = {}; for (const x of book().missed) { if (!x.done || x.preset !== preset || (x.mode ?? 'paper') !== state.mode) continue; (out[x.rule] ??= []).push(x); }
+export function missedByRule(preset = state.preset, cohort = null) {
+  const out = {}; for (const x of book().missed) { if (!x.done || x.preset !== preset || (x.mode ?? 'paper') !== state.mode || (cohort && !learningSample(x, { ...cohort, preset, mode: state.mode }))) continue; (out[x.rule] ??= []).push(x); }
   return Object.fromEntries(Object.entries(out).map(([k, l]) => [k, { n: l.length, avg: l.reduce((a, b) => a + b.result, 0) / l.length, list: l }]));
 }
-export function afterByReason(preset = state.preset) {
-  const out = {}; for (const x of book().after) { if (!x.done || x.preset !== preset || (x.mode ?? 'paper') !== state.mode) continue; (out[x.reason] ??= []).push(x); }
+export function afterByReason(preset = state.preset, cohort = null) {
+  const out = {}; for (const x of book().after) { if (!x.done || x.preset !== preset || (x.mode ?? 'paper') !== state.mode || (cohort && !learningSample(x, { ...cohort, preset, mode: state.mode }))) continue; (out[x.reason] ??= []).push(x); }
   return Object.fromEntries(Object.entries(out).map(([k, l]) => [k, { n: l.length, max: l.reduce((a, b) => a + b.afterMax, 0) / l.length, end: l.reduce((a, b) => a + b.afterEnd, 0) / l.length }]));
 }
 

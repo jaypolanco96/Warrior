@@ -153,6 +153,6 @@ test('Exits on the dial: trailing stop start and distance, trend-break and time 
   const { validateSettings } = await import('../lib/strategy.mjs'), r = validateSettings({ targetPct: 100, trailing: 0, trendExit: 0, holdHours: 0 }); assert.equal(r.timeLimit, 0);
   assert.match(exits(r), /trailing stop is off\. There is no time limit\. A broken trend does not sell/); assert.match(exits(validateSettings({ trailStartPct: 40, trailGapPct: 12, holdHours: 48 })), /after a gain of 40% and follows 12% under the highest price\. Positions are sold after 48 hours/);
   const { validateSettings: vs } = await import('../lib/strategy.mjs');
-  assert.equal(vs({ holdHours: 48 }).maxHoldBars, 576); assert.equal(resolveRules({}).settings.maxHoldBars, 36, 'presets sell after 3 hours');
+  assert.equal(vs({ holdHours: 48 }).maxHoldBars, 576); assert.equal(resolveRules({}).settings.maxHoldBars, 48, 'presets sell after 4 hours');
   for (const bad of [{ trailing: 2 }, { trailGapPct: 95 }, { holdHours: 1.5 }, { holdHours: 500 }, { trailStartPct: -5 }, { trailStartPct: 0.5 }]) assert.throws(() => vs(bad), JSON.stringify(bad));
 });
