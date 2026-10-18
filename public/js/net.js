@@ -13,8 +13,6 @@ const still = () => window.matchMedia('(prefers-reduced-motion: reduce)').matche
 
 export function startNet(el, list) {
   canvas = el; ctx = el.getContext('2d'); agents = list; logo = new Image(); logo.src = '/logo.svg';
-  const fit = () => { const r = canvas.getBoundingClientRect(), d = window.devicePixelRatio || 1; canvas.width = Math.max(1, r.width * d); canvas.height = Math.max(1, r.height * d); ctx.setTransform(d, 0, 0, d, 0, 0); };
-  new ResizeObserver(fit).observe(canvas); fit();
   cancelAnimationFrame(raf); const loop = () => { draw(); raf = requestAnimationFrame(loop); }; loop();
 }
 /** An agent acted: light it up and send a pulse from it to the centre (or to another agent). */
@@ -25,7 +23,13 @@ function place(w, h) {
   return agents.map((a, i) => { const ang = -Math.PI / 2 + i * (Math.PI * 2 / agents.length) + t; return { ...a, x: cx + Math.cos(ang) * R * 1.25, y: cy + Math.sin(ang) * R, c: COLORS[i % COLORS.length] }; });
 }
 function draw() {
-  const w = canvas.clientWidth, h = canvas.clientHeight, now = performance.now(); if (!w || !h) return;
+  const w = canvas.clientWidth, h = canvas.clientHeight, now = performance.now(); if (!w || !h || ctx.isContextLost?.()) return;
+  // Graphics recovery resets canvas state without necessarily resizing its CSS box. Re-establish CSS-pixel coordinates
+  // every frame, and detect monitor/zoom density changes even when ResizeObserver would see no size change.
+  const d = window.devicePixelRatio || 1, width = Math.max(1, Math.round(w * d)), height = Math.max(1, Math.round(h * d));
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
+  ctx.setTransform(width / w, 0, 0, height / h, 0, 0);
   ctx.clearRect(0, 0, w, h);
   const cx = w / 2, cy = h / 2, nodes = place(w, h), byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
   // faint beadwork rings

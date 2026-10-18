@@ -62,6 +62,29 @@ try {
   page.on('pageerror', (e) => { errors.push(e.message); console.error('BROWSER:', e.message); });
   await page.goto(base);
   await page.waitForFunction(() => document.getElementById('equity').textContent.includes('SOL'));
+  // A graphics reset clears the scale transform even when the canvas's CSS box has not changed.
+  const display = await context.newCDPSession(page);
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(theme => { document.documentElement.dataset.theme = theme; }, theme);
+    let cssSize;
+    for (const density of [1, 1.25, 2, 3, 1]) {
+      await display.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: density, mobile: false });
+      await page.waitForFunction(d => {
+        const c = document.getElementById('net'), t = c.getContext('2d').getTransform();
+        return devicePixelRatio === d && c.width === Math.round(c.clientWidth*d) && c.height === Math.round(c.clientHeight*d) && Math.abs(t.a-c.width/c.clientWidth)<.001;
+      }, density);
+      const before = await page.locator('#net').evaluate(c => ({ w: c.clientWidth, h: c.clientHeight }));
+      cssSize ??= before;
+      check(Math.abs(before.w-cssSize.w)<=1 && Math.abs(before.h-cssSize.h)<=1, `${theme} ${density}x: density changes preserve shield layout size`);
+      await page.locator('#net').evaluate(c => c.getContext('2d').reset());
+      await page.waitForFunction(() => { const c=document.getElementById('net'),t=c.getContext('2d').getTransform();return Math.abs(t.a-c.width/c.clientWidth)<.001 && Math.abs(t.d-c.height/c.clientHeight)<.001; });
+      check(await page.locator('#net').evaluate(c => c.clientWidth>0 && c.clientHeight>=330), `${theme} ${density}x: shield and agents recover after graphics reset`);
+    }
+    const hidden = await page.locator('#net').evaluate(async c => { const size=[c.width,c.height];c.hidden=true;c.style.display='none';await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const kept=c.width===size[0]&&c.height===size[1];c.hidden=false;c.style.removeProperty('display');return kept; });
+    check(hidden, `${theme}: temporary hidden canvas retains its bitmap dimensions`);
+  }
+  await display.send('Emulation.clearDeviceMetricsOverride'); await display.detach();
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'light'; });
   // A failed Live start must not keep the browser's trading lock.
   const startResult = await page.evaluate(async () => {
     const { state } = await import('/js/store.js'), { start } = await import('/js/impi.js');

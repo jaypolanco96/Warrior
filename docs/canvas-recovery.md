@@ -1,0 +1,7 @@
+# Shield and agent canvas recovery
+
+The shield network previously set its drawing transform only during initialization or a CSS resize. A graphics-context reset can clear that transform while leaving the canvas dimensions unchanged. On a 2× display, a synthetic context reset reproduced the reported shrink: the transform fell from 2 to 1 and stayed there while animation continued. This reproduces an application failure consistent with the symptom; it does not diagnose the computer's display flicker itself.
+
+`public/js/net.js` now re-establishes CSS-pixel drawing coordinates every frame, independently of resize notifications. It also checks backing-store dimensions against current display density, resizing only when needed, and skips zero-sized or lost contexts without stopping the animation loop. This allows the existing loop to recover on the next available frame after graphics recovery, monitor/zoom changes, or temporary hiding. No trading or layout rules change.
+
+The isolated browser regression resets the actual 2D context and changes device density through Chromium emulation at 1×, 1.25×, 2×, 3× and back to 1× in both themes. It verifies stable CSS dimensions, restored transforms and preservation of backing-store dimensions while hidden. Existing phone/tablet/desktop, tour and funding checks run in the same suite. Synthetic reset and density checks do not reproduce a physical graphics-driver failure.
