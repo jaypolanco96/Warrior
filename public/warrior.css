@@ -375,3 +375,10 @@ dialog .dlg{max-height:calc(100vh - 40px);overflow:auto}
 #alerts-toggle[aria-pressed=true]{border-color:var(--up);color:var(--up)}
 #drum-toggle[aria-pressed=true]{border-color:var(--r2);color:var(--r2)}
 @media (max-width:1400px){.care-grid{grid-template-columns:minmax(0,1fr)}.care-grid .care-block + .care-block{border-left:0;padding-left:0;border-top:1px dashed var(--line);padding-top:10px;margin-top:6px}}
+
+/* Token names must not push balances, receipt buttons or position controls out of view. */
+.pf-list li,.pf-list.recent li{grid-template-columns:10px minmax(0,1fr) auto auto}
+.pf-list li > span{min-width:0;overflow-wrap:anywhere}
+.positions .book td:first-child{max-width:160px;white-space:normal;overflow-wrap:anywhere}
+.pos-head h3,#dlg-title{min-width:0;overflow-wrap:anywhere}
+@media (max-width:700px){.positions .book td:first-child{max-width:none}}

@@ -1,16 +1,17 @@
 // The dashboard: draws the desk and wires every control. Trading logic lives in impi.js and trader.js.
-import { state, save, on, emit, reload, exclusive } from './store.js';
+import { state, save, on, emit, reload, exclusive, lock } from './store.js';
 import { sync, syncNow } from './sync.js';
 import { drawOrders, drawPortfolio } from './tools.js';
 import { vault, owner, connectPhantom, disconnectPhantom, reconnectPhantom, fundFromPhantom, withdraw, liveBalance } from './wallet.js';
 import { AGENTS, impi, start, stop, peek, rules } from './impi.js';
 import { sell, sellAll, balance, heldSol, writeOff, swapped } from './trader.js';
 import { receipt } from '/vendor/lib/receipt.js';
+import { csvCell } from '/vendor/lib/portfolio.js';
 import { validateBedtime, bedtimeText } from '/vendor/lib/mood.js';
 import { startNet, setData } from './net.js';
 import { rebasePosition } from '/vendor/lib/strategy.js';
 /** As in Laugh: open positions take the new strength's stop and target at once. A stop that has already moved up to the price paid or above is kept. */
-function followRules() { const s = rules().settings; let moved = 0; for (const p of state.positions) { const r = rebasePosition(p, s); if (!r) continue; p.target = r.target; p.stop = r.stop; p.baseStop = r.baseStop; p.rules = rules().version; moved++; } if (moved) emit('say', { who: 'induna', text: `${moved} open position${moved === 1 ? '' : 's'} now follow the new strength's stop and target.` }); }
+function followRules() { const s = rules().settings; let moved = 0; for (const p of state.positions) { if (p.mode !== state.mode) continue; const r = rebasePosition(p, s); if (!r) continue; p.target = r.target; p.stop = r.stop; p.baseStop = r.baseStop; p.rules = rules().version; moved++; } if (moved) emit('say', { who: 'induna', text: `${moved} open position${moved === 1 ? '' : 's'} now follow the new strength's stop and target.` }); }
 import { line, hist, bars } from './charts.js';
 
 const $ = (id) => document.getElementById(id);
@@ -71,9 +72,12 @@ function ticker(scan) {
 }
 
 // ---------- equity, stats and positions ----------
+let moneyDraw = 0;
 async function drawMoney() {
+  const request = ++moneyDraw, mode = state.mode;
   const mine = state.trades.filter((t) => t.mode === state.mode), whole = mine.filter((t) => !t.partial), won = whole.filter((t) => t.pnlSol > 0);
   let bal = 0; try { bal = await balance(); } catch { /* offline */ }
+  if (request !== moneyDraw || mode !== state.mode) return;
   const eq = bal + heldSol(), curve = state.equity.filter((e) => e.mode === state.mode).map((e) => e.v);
   $('equity').textContent = `${eq.toFixed(4)} SOL`; $('pnl-mode').textContent = state.mode === 'live' ? 'LIVE' : 'PRACTICE';
   const first = curve[0] ?? eq, ch = first ? (eq / first - 1) * 100 : 0; $('pnl-change').textContent = curve.length ? pct(ch) : ''; $('pnl-change').className = `chg ${ch >= 0 ? 'up' : 'down'}`;
@@ -85,7 +89,7 @@ async function drawMoney() {
   $('s-best').textContent = pcts.length ? pct(Math.max(...pcts)) : '—'; $('s-worst').textContent = pcts.length ? pct(Math.min(...pcts)) : '—';
   $('s-pf').textContent = losses > 0 ? (gains / losses).toFixed(2) : gains > 0 ? '∞' : '—'; $('s-hold').textContent = held.length ? `${Math.round(held.reduce((a, b) => a + b, 0) / held.length)}m` : '—';
   $('s-best').className = 'up'; $('s-worst').className = 'down';
-  $('positions').replaceChildren(...(open.length ? open.map((p) => { const tr = el('tr'), now = Number.isFinite(p.nowSol) ? p.nowSol + (p.rentSol ?? 0) : p.solIn, g = (Number.isFinite(p.nowSol) ? p.nowSol / swapped(p) - 1 : 0) * 100, b = el('button', 'sell', 'Sell'); b.type = 'button';
+  $('positions').replaceChildren(...(open.length ? open.map((p) => { const tr = el('tr'), now = p.empty ? 0 : Number.isFinite(p.nowSol) ? p.nowSol + (p.rentSol ?? 0) : p.solIn, g = p.empty ? -100 : (Number.isFinite(p.nowSol) ? p.nowSol / swapped(p) - 1 : 0) * 100, b = el('button', 'sell', 'Sell'); b.type = 'button';
     b.addEventListener('click', async () => { b.disabled = true; try { await exclusive(() => sell(p, 'manual')); } catch (e) { emit('say', { who: 'induna', text: `${p.symbol}: ${e.message}`, tone: 'down' }); } void drawMoney(); });
     const name = el('a', '', `${p.symbol}${p.dip ? ' · dip' : ''}`); name.href = `https://dexscreener.com/solana/${p.mint}`; name.target = '_blank'; name.rel = 'noopener';
     const px = p.last ?? p.entry, toStop = (p.stop / px - 1) * 100, toTgt = (p.target / px - 1) * 100, span = el('td', 'range'), bar = el('span', 'rbar'), mark = el('i'), at = Math.max(0, Math.min(1, (px - p.stop) / ((p.target - p.stop) || 1)));
@@ -107,10 +111,10 @@ function drawControls() {
   $('connect').textContent = owner.address ? 'Disconnect' : 'Connect Phantom'; $('phantom-info').textContent = owner.address ? `Phantom ${owner.address.slice(0, 4)}…${owner.address.slice(-4)}` : '';
   ticker(impi.lastScan);
 }
-const setMode = (m) => { if (impi.running) { emit('say', { who: 'induna', text: 'Call the impi back before switching between practice and live.' }); return; } state.mode = m; save(); drawControls(); drawWallet(); void drawMoney(); };
+const setMode = (m) => { if (lock.busy || impi.starting) { emit('say', { who: 'induna', text: 'Wait for the current action to finish before switching modes.' }); return; } if (impi.running) { emit('say', { who: 'induna', text: 'Call the impi back before switching between practice and live.' }); return; } state.mode = m; save(); drawControls(); drawWallet(); drawPortfolio(); drawOrders(); emit('mode'); void drawMoney(); };
 $('mode-paper').addEventListener('click', () => setMode('paper'));
 $('mode-live').addEventListener('click', () => setMode('live'));
-document.querySelectorAll('.preset').forEach((b) => b.addEventListener('click', () => { state.preset = b.dataset.preset; followRules(); save(); drawControls(); emit('say', { who: 'induna', text: `Strength set to ${b.textContent}: ${rules().risk.maxOpenPositions} coins at once, ${rules().risk.riskPerTradePct}% of the wallet at risk a trade.` }); void peek(); }));
+document.querySelectorAll('.preset').forEach((b) => b.addEventListener('click', () => { if (lock.busy || impi.starting) { emit('say', { who: 'induna', text: 'Wait for the current action to finish before changing strength.' }); return; } state.preset = b.dataset.preset; followRules(); save(); drawControls(); emit('strength'); emit('say', { who: 'induna', text: `Strength set to ${b.textContent}: ${rules().risk.maxOpenPositions} coins at once, ${rules().risk.riskPerTradePct}% of the wallet at risk a trade.` }); void peek(); }));
 let armed = 0;
 $('go').addEventListener('click', () => {
   if (impi.running) { stop(); drawControls(); return; }
@@ -127,7 +131,7 @@ $('out').addEventListener('click', async () => {
 // The full history as a spreadsheet file: every sale, its costs already inside the result, practice and live marked.
 $('csv').addEventListener('click', () => {
   const rows = [['closed_at_utc', 'mode', 'coin', 'kind', 'sol_in', 'sol_out', 'result_sol', 'result_pct', 'why_closed', 'part_sale', 'opened_at_utc', 'minutes_held', 'rules_version', 'round_trip_cost_pct', 'coin_address'], ...state.trades.map((t) => [new Date(t.closedAt).toISOString(), t.mode === 'live' ? 'live' : 'practice', t.symbol, t.style ?? '', t.solIn.toFixed(6), t.solOut.toFixed(6), t.pnlSol.toFixed(6), t.pnlPct.toFixed(2), t.reason, t.partial ? 'yes' : 'no', t.openedAt ? new Date(t.openedAt).toISOString() : '', t.openedAt ? ((t.closedAt - t.openedAt) / 60000).toFixed(1) : '', t.rules ?? '', Number.isFinite(t.costPct) ? t.costPct.toFixed(2) : '', t.mint])];
-  const csv = rows.map((r) => r.map((v) => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v)).join(',')).join('\n'), a = el('a');
+  const csv = rows.map((r) => r.map(csvCell).join(',')).join('\n'), a = el('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `warrior-trades-${new Date().toISOString().slice(0, 10)}.csv`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 });
 // Reset the day (from Laugh): today's loss count starts again from what the wallet is worth now. A second tap confirms.
@@ -139,28 +143,37 @@ $('reset-day').addEventListener('click', async () => {
   emit('say', { who: 'induna', text: `The day starts again from ${eq.toFixed(4)} SOL. The daily loss limit counts from here.` });
 });
 $('reset').addEventListener('click', () => {
-  if (impi.running || state.mode !== 'paper') { emit('say', { who: 'umlobi', text: 'Practice can be reset in practice mode, with the impi resting.' }); return; }
-  state.paperSol = 1; state.positions = state.positions.filter((p) => p.mode !== 'paper'); state.trades = state.trades.filter((t) => t.mode !== 'paper'); state.equity = state.equity.filter((e) => e.mode !== 'paper'); if (state.days) delete state.days.paper; save();
-  emit('say', { who: 'umlobi', text: 'Practice reset to a pretend 1 SOL.' }); void drawMoney();
+  if (lock.busy || impi.starting || impi.running || state.mode !== 'paper') { emit('say', { who: 'umlobi', text: 'Practice can be reset in practice mode, with the impi resting and no action in progress.' }); return; }
+  state.paperSol = 1; state.positions = state.positions.filter((p) => p.mode !== 'paper'); state.trades = state.trades.filter((t) => t.mode !== 'paper'); state.equity = state.equity.filter((e) => e.mode !== 'paper'); if (state.days) delete state.days.paper;
+  state.orders = state.orders.filter((o) => o.mode !== 'paper'); save(); drawOrders(); drawPortfolio(); emit('mode'); emit('say', { who: 'umlobi', text: 'Practice reset to a pretend 1 SOL.' }); void drawMoney();
 });
 $('connect').addEventListener('click', async () => { try { if (owner.address) await disconnectPhantom(); else await connectPhantom(); } catch (e) { emit('say', { who: 'induna', text: e.message, tone: 'down' }); } drawControls(); drawWallet(); });
 on('running', () => { state.wasRunning = impi.running; save(); drawControls(); }); on('wallet', () => { drawControls(); drawWallet(); });
 
 // ---------- the trading wallet panel and its small dialog ----------
 const dlg = $('dlg');
+let dialogVersion = 0;
+$('dlg-close').addEventListener('click', () => dlg.close());
+dlg.addEventListener('close', () => { if (dlg.open) return; dialogVersion++; $('dlg-body').replaceChildren(); $('dlg-status').textContent = ''; $('dlg-go').onclick = null; });
 function ask({ title, text, fields = [], action, run }) {
+  const version = ++dialogVersion;
   $('dlg-title').textContent = title; const body = $('dlg-body'); body.replaceChildren(el('p', 'small', text)); $('dlg-status').textContent = '';
-  const inputs = {}; for (const f of fields) { const wrap = el('div', 'field'), l = el('label', '', f.label), i = el('input'); i.type = f.type ?? 'password'; i.autocomplete = f.ac ?? (i.type === 'password' ? 'current-password' : 'off'); if (i.type === 'password') i.name = 'password'; i.id = `f-${f.id}`; l.htmlFor = i.id; wrap.append(l, i); body.append(wrap); inputs[f.id] = i; }
+  const inputs = {}; for (const f of fields) { const wrap = el('div', 'field'), l = el('label', '', f.label), i = el('input'); i.type = f.type ?? 'password'; i.autocomplete = f.ac ?? (i.type === 'password' ? 'current-password' : 'off'); if (i.type === 'password') i.name = 'password'; if (i.type === 'number') { i.step = 'any'; i.min = '0.000000001'; i.inputMode = 'decimal'; } i.id = `f-${f.id}`; l.htmlFor = i.id; wrap.append(l, i); body.append(wrap); inputs[f.id] = i; }
   // A hidden username lets the browser's password manager save and fill the passphrase for this one wallet.
   if (fields.some((f) => (f.type ?? 'password') === 'password')) { const u = el('input'); u.type = 'text'; u.name = 'username'; u.autocomplete = 'username'; u.value = 'Warrior trading wallet'; u.hidden = true; body.prepend(u); }
   for (const i of Object.values(inputs)) i.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('dlg-go').click(); } });
   const go = $('dlg-go'); go.textContent = action; go.hidden = !action; go.disabled = false;
-  go.onclick = async () => { go.disabled = true; $('dlg-status').textContent = 'Working…'; try { const out = await run(Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.value]))); if (typeof out === 'string') { $('dlg-status').textContent = out; go.hidden = true; } else dlg.close(); drawWallet(); } catch (e) { $('dlg-status').textContent = e.message; go.disabled = false; } };
+  go.onclick = async () => { go.disabled = true; $('dlg-status').textContent = 'Working…'; try { const out = await run(Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.value]))); if (version === dialogVersion && dlg.open) { if (typeof out === 'string') { $('dlg-status').textContent = out; go.hidden = true; } else dlg.close(); } drawWallet(); void drawMoney(); } catch (e) { if (version === dialogVersion && dlg.open) { $('dlg-status').textContent = e.message; go.disabled = false; } } };
   dlg.showModal();
 }
 // Money you move in or out of the live wallet is not a gain or a loss: the day's starting equity moves with it, so a
 // withdrawal never trips the daily loss limit and a deposit never hides a real loss.
 function moved(sol) { const d = state.days?.live; if (d && Number.isFinite(d.start) && Number.isFinite(sol)) { d.start = Math.max(0, d.start + sol); save(); } }
+function transferMessage(result, confirmed) {
+  const text = result.outcome === 'confirmed' ? confirmed : result.outcome === 'failed' ? 'The transfer failed on-chain. Check the wallet before trying again.' : `Transfer submitted, but confirmation is still unknown. Check the wallet before sending again. Transaction: ${result.signature}`;
+  emit('say', { who: 'umlobi', text, tone: result.outcome === 'confirmed' ? 'up' : 'down' });
+  return text;
+}
 async function drawWallet() {
   const box = $('w-body'); box.replaceChildren();
   if (!vault.exists) {
@@ -182,8 +195,8 @@ async function drawWallet() {
   if (vault.unlocked && !vault.hasPasskey && vault.passkeySupported) add('Add a passkey (fingerprint or face)', true, async () => { try { await vault.addPasskey(); emit('say', { who: 'induna', text: 'Passkey added: this device can unlock the wallet with your fingerprint, face or PIN. The passphrase still works.' }); } catch (e) { emit('say', { who: 'induna', text: `${e?.name === 'NotAllowedError' ? 'Passkey not added: the prompt was cancelled' : e.message}.`, tone: 'down' }); } });
   if (!vault.unlocked) add(vault.hasPasskey ? 'Unlock with passphrase' : 'Unlock', !!vault.hasPasskey, () => ask({ title: 'Unlock the trading wallet', text: 'It stays unlocked in this tab until you lock it or close the tab.', fields: [{ id: 'p', label: 'PASSPHRASE' }], action: 'Unlock', run: (v) => vault.unlock(v.p) }));
   else add('Lock', true, () => { vault.lock(); });
-  add('Fund from Phantom', false, () => ask({ title: 'Send SOL from Phantom', text: owner.address ? 'Phantom will show the amount and ask you to approve.' : 'Connect Phantom first (top right).', fields: owner.address ? [{ id: 's', label: 'SOL TO SEND', type: 'number' }] : [], action: owner.address ? 'Send' : '', run: async (v) => { const r = await fundFromPhantom(Number(v.s)); if (r.outcome === 'confirmed') moved(Number(v.s)); return r.outcome === 'confirmed' ? `Sent. It is in the trading wallet.` : `Sent; the network says: ${r.outcome}. Check the balance in a minute.`; } }));
-  if (vault.unlocked) add('Send to Phantom', true, () => ask({ title: 'Send SOL back', text: `To ${owner.address ? 'your connected Phantom' : 'the address below'}. Keep about 0.01 SOL for fees.`, fields: [{ id: 's', label: 'SOL TO SEND', type: 'number' }, ...(owner.address ? [] : [{ id: 'to', label: 'TO ADDRESS', type: 'text' }])], action: 'Send', run: async (v) => { const r = await withdraw(owner.address || v.to.trim(), Number(v.s)); if (r.outcome === 'confirmed') moved(-Number(v.s)); return r.outcome === 'confirmed' ? 'Sent.' : `Sent; the network says: ${r.outcome}.`; } }));
+  add('Fund from Phantom', false, () => ask({ title: 'Send SOL from Phantom', text: owner.address ? 'Phantom will show the amount and ask you to approve.' : 'Connect Phantom first (top right).', fields: owner.address ? [{ id: 's', label: 'SOL TO SEND', type: 'number' }] : [], action: owner.address ? 'Send' : '', run: async (v) => { const r = await exclusive(() => fundFromPhantom(Number(v.s))); if (r.outcome === 'confirmed') moved(Number(v.s)); return transferMessage(r, 'Sent. It is in the trading wallet.'); } }));
+  if (vault.unlocked) add('Send to Phantom', true, () => ask({ title: 'Send SOL back', text: `To ${owner.address ? 'your connected Phantom' : 'the address below'}. Keep about 0.01 SOL for fees.`, fields: [{ id: 's', label: 'SOL TO SEND', type: 'number' }, ...(owner.address ? [] : [{ id: 'to', label: 'TO ADDRESS', type: 'text' }])], action: 'Send', run: async (v) => { const r = await exclusive(() => withdraw(owner.address || v.to.trim(), Number(v.s))); if (r.outcome === 'confirmed') moved(-Number(v.s)); return transferMessage(r, 'Sent.'); } }));
   add(state.backedUp ? 'Backup key' : 'Save the backup key (needed for live)', !!state.backedUp, () => ask({ title: 'Your backup key', text: 'Type the passphrase to show it. Anyone with this key controls the wallet: never paste it into a website or chat.', fields: [{ id: 'p', label: 'PASSPHRASE' }], action: 'Show', run: async (v) => { const k = await vault.backup(v.p); state.backedUp = true; save(); return `Backup key: ${k}`; } }));
   box.append(row, syncLine());
 }
@@ -205,7 +218,7 @@ function drawScore() {
 $('pause-after').addEventListener('change', () => { state.pauseAfter = Number($('pause-after').value); save(); emit('say', { who: 'induna', text: state.pauseAfter ? `The impi will pause after ${state.pauseAfter} losing trades in a row.` : 'The impi will not pause for a losing streak (the daily loss limit still applies).' }); });
 let scoreArmed = 0;
 $('score-reset').addEventListener('click', () => { if (Date.now() - scoreArmed > 5000) { scoreArmed = Date.now(); $('score-reset').textContent = 'Tap again to reset'; setTimeout(() => { $('score-reset').textContent = 'Reset scorecard'; }, 5000); return; } resetBooks(); $('score-reset').textContent = 'Reset scorecard'; });
-on('shadow', drawScore); on('synced', drawScore); drawScore();
+on('mode', drawScore); on('strength', drawScore); on('shadow', drawScore); on('synced', drawScore); drawScore();
 
 // ---------- care: bedtime and the sweep (from Laugh) ----------
 function drawCare() {
@@ -231,6 +244,7 @@ on('synced', drawCare); on('wallet', drawCare); drawCare();
 
 // ---------- the honest receipt (from Laugh) ----------
 export function showReceipt(t) {
+  dialogVersion++; $('dlg-go').onclick = null;
   const r = receipt(t), body = $('dlg-body'), table = el('div', 'receipt');
   $('dlg-title').textContent = 'Honest receipt';
   const meta = el('p', 'small', `${t.symbol} · closed ${new Date(t.closedAt).toLocaleString()} · ${t.reason}${t.partial ? ' (part)' : ''} · rules ${t.rules ?? '—'} · ${t.mode === 'live' ? 'live' : 'practice'}`);

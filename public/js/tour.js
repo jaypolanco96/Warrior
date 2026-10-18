@@ -107,4 +107,4 @@ window.addEventListener('scroll', () => { if (open) place(); }, { passive: true 
 document.getElementById('tour')?.addEventListener('click', () => start(0));
 // a first visit starts it once the desk has drawn
 let seen = false; try { seen = localStorage.getItem(SEEN) === '1'; } catch { seen = true; }
-if (!seen) setTimeout(() => start(0), 1600);
+if (!seen) setTimeout(() => { if (!document.querySelector('dialog[open]')) start(0); }, 1600);

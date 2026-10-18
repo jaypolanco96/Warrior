@@ -21,8 +21,8 @@ export const AGENTS = [
 ];
 export const rules = () => resolveRules({ preset: state.preset, adapt: dials() });
 const heard = {};
-let running = false, timer = 0, watcher = 0, last = null, nextAt = 0, rounds = 0, ms = 0;
-export const impi = { get running() { return running; }, get lastScan() { return last; }, get nextAt() { return nextAt; }, get rounds() { return rounds; }, get scanMs() { return ms; } };
+let running = false, starting = false, timer = 0, watcher = 0, last = null, nextAt = 0, rounds = 0, ms = 0;
+export const impi = { get running() { return running; }, get starting() { return starting; }, get lastScan() { return last; }, get nextAt() { return nextAt; }, get rounds() { return rounds; }, get scanMs() { return ms; } };
 const say = (who, text, tone) => emit('say', { who, text, tone });
 on('say', ({ who }) => fire(who));
 
@@ -92,7 +92,7 @@ function roundTalk(scan, read, R) {
 async function guard() { if (lock.busy) return; lock.busy = true; try { await watch(rules()); emit('positions'); } catch (e) { problem('guard', `Open positions could not be checked (${e.message}). Trying again in 30 seconds; their stops are still checked against the live price.`); } finally { lock.busy = false; } }
 
 // Another device's copy of the positions never replaces this one in the middle of a trade.
-holdWhile(() => !lock.busy);
+holdWhile(() => !lock.busy && !starting);
 // Bedtime (from Laugh, off unless you set it): no new buys between the hours you choose; optionally close everything.
 let bedSaid = 0;
 const bed = () => { const d = new Date(); return bedtimeState(state.bedtime ?? { on: false }, d.getHours() * 60 + d.getMinutes()); };
@@ -109,12 +109,17 @@ async function claimTab() {
 async function keepAwake() { try { if (running && document.visibilityState === 'visible' && !wake) { wake = await navigator.wakeLock?.request('screen'); wake?.addEventListener?.('release', () => { wake = null; }); } } catch { wake = null; } }
 document.addEventListener('visibilitychange', () => void keepAwake());
 export async function start() {
-  if (running) return null;
-  if (!(await claimTab())) return 'The impi is already out in another Warrior tab in this browser. Call it back there first, or use that tab.';
-  if (live()) { if (!vault.exists) return 'Make the trading wallet first.'; if (!vault.unlocked) return 'Unlock the trading wallet first.'; if (!state.backedUp) return 'Save the backup key first.'; }
-  const held = await claimTrading(); if (held) { releaseTab?.(); releaseTab = null; return held; } // one device trades at a time
-  running = true; state.streakFrom = Date.now(); save(); say('induna', `The impi is out: ${state.preset}, ${live() ? 'LIVE with real SOL' : 'practice money'}.`); void round();
-  timer = setInterval(round, 60_000); watcher = setInterval(guard, 30_000); void keepAwake(); emit('running'); return null;
+  if (running || starting) return null;
+  if (lock.busy) return 'Wait for the current action to finish before sending the impi.';
+  starting = true;
+  try {
+    if (live()) { if (!vault.exists) return 'Make the trading wallet first.'; if (!vault.unlocked) return 'Unlock the trading wallet first.'; if (!state.backedUp) return 'Save the backup key first.'; }
+    if (!(await claimTab())) return 'The impi is already out in another Warrior tab in this browser. Call it back there first, or use that tab.';
+    const held = await claimTrading(); if (held) return held; // one device trades at a time
+    running = true; state.streakFrom = Date.now(); save(); say('induna', `The impi is out: ${state.preset}, ${live() ? 'LIVE with real SOL' : 'practice money'}.`); void round();
+    timer = setInterval(round, 60_000); watcher = setInterval(guard, 30_000); void keepAwake(); emit('running'); return null;
+  } catch (e) { return `The impi could not start (${e.message}). Try again.`; }
+  finally { starting = false; if (!running) { releaseTab?.(); releaseTab = null; } }
 }
 // Pause after a losing streak: the chosen number of whole trades in a row lost since the impi was last sent out.
 export function losingStreak() { let n = 0; for (const t of state.trades) { if (t.mode !== state.mode || t.partial || t.closedAt < (state.streakFrom ?? 0)) continue; n = t.pnlSol < 0 ? n + 1 : 0; } return n; }

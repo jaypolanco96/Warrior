@@ -66,7 +66,8 @@ export function openPosition(start) {
   exits.append(two, el('div', 'row'), sE); exits.lastChild.previousSibling.append(
     button('Save my stop and target', '', () => {
       const p = find(mint, mode); if (!p) { sE.textContent = 'That position is no longer open.'; return; }
-      const sv = stopIn.value === '' ? null : base * (1 - Number(stopIn.value) / 100), tv = tgtIn.value === '' ? null : base * (1 + Number(tgtIn.value) / 100), v = validateExits({ entry: base, stop: sv, target: tv }, p.last ?? null);
+      const entry = p.entry;
+      const sv = stopIn.value === '' ? null : entry * (1 - Number(stopIn.value) / 100), tv = tgtIn.value === '' ? null : entry * (1 + Number(tgtIn.value) / 100), v = validateExits({ entry, stop: sv, target: tv }, p.last ?? null);
       if (!v.ok) { sE.textContent = `${v.reasons.join('. ')}.`; return; }
       p.ownStop = sv; p.ownTarget = tv; save(); emit('positions');
       sE.textContent = `Saved. ${sv ? `Sells if the price falls to ${usd(sv)}.` : 'No stop of your own.'} ${tv ? `Sells if it rises to ${usd(tv)}.` : 'No target of your own.'}`;
@@ -77,13 +78,13 @@ export function openPosition(start) {
   const above = section('Sell if it gets dearer', `Sells part of the position when the price reaches a level over the price now (${usd(now)}).`), sO = status();
   const [wO, atIn] = numberField('Sell at (% above what I paid)', { step: '1', min: '1', value: String(Math.max(1, Math.ceil((now * 1.1 / base - 1) * 100))) }), [wF, shareIn] = numberField('How much (%)', { step: '5', min: '5', max: '100', value: '50' });
   const two2 = el('div', 'fields'); two2.append(wO, wF);
-  above.append(two2, button('Place sell-above order', '', () => place(sO, [{ price: base * (1 + Number(atIn.value) / 100), fraction: Number(shareIn.value) / 100 }])), sO);
+  above.append(two2, button('Place sell-above order', '', () => place(sO, [{ price: (find(mint, mode)?.entry ?? base) * (1 + Number(atIn.value) / 100), fraction: Number(shareIn.value) / 100 }])), sO);
 
   // take profit in steps
   const steps = section('Take profit in steps', 'Three sell orders: a third of what you hold at each gain over what you paid. Each must be over the price now.'), sL = status();
   const ins = [25, 50, 100].map((v, i) => numberField(`Step ${i + 1} (% above paid)`, { step: '1', min: '1', value: String(Math.max(v, Math.ceil((now * (1.05 + i * 0.1) / base - 1) * 100))) })), three = el('div', 'fields three'); three.append(...ins.map((x) => x[0]));
   steps.append(three, button('Place the three sell orders', '', () => {
-    const at = ins.map((x) => base * (1 + Number(x[1].value) / 100)); if (!(at[0] < at[1] && at[1] < at[2])) { sL.textContent = 'Each step must be higher than the one before.'; return; }
+    const at = ins.map((x) => (find(mint, mode)?.entry ?? base) * (1 + Number(x[1].value) / 100)); if (!(at[0] < at[1] && at[1] < at[2])) { sL.textContent = 'Each step must be higher than the one before.'; return; }
     place(sL, at.map((price, i) => ({ price, fraction: [1 / 3, 1 / 2, 1][i] })));
   }), sL);
 
@@ -154,5 +155,5 @@ export function drawPortfolio() {
   const recentBlock = recent.length ? [el('h3', 'label sub', 'RECENT TRADES · HONEST RECEIPTS'), rl] : [];
   box.replaceChildren(grid, ...recentBlock, ...(s.holdings.length ? [bar, list] : [el('p', 'small', 'No coins held right now. Holdings, their share of the portfolio and their live profit show here.')]));
 }
-on('trade', () => { drawPortfolio(); drawOrders(); }); on('equity', drawPortfolio); on('synced', () => { drawPortfolio(); drawOrders(); });
+on('trade', () => { drawPortfolio(); drawOrders(); }); on('positions', drawPortfolio); on('equity', drawPortfolio); on('synced', () => { drawPortfolio(); drawOrders(); });
 drawOrders(); drawPortfolio();

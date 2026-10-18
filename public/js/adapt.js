@@ -91,4 +91,4 @@ export function draw() {
   if (b.history.length) parts.push(el('h3', 'label sub', 'WHAT IT DID AND WHY'), hist);
   box.replaceChildren(...parts);
 }
-on('synced', draw); draw();
+on('mode', draw); on('strength', draw); on('synced', draw); draw();

@@ -90,5 +90,5 @@ export function draw() {
   const pending = [...w.missed, ...w.after, ...w.dips].filter((x) => !x.done).length;
   box.replaceChildren(el('h3', 'label sub', 'DIP WEATHER'), gauge, guard, el('h3', 'label sub', 'MISSED TRADES · WOULD THE RULE HAVE PAID?'), mt, el('h3', 'label sub', 'AFTER THE SALE · TOO EARLY OR JUST IN TIME?'), at, el('p', 'small', `${pending} being followed now. Prices sampled every 3 minutes; a red “3 h later” means the coin kept rising after the sale.`));
 }
-on('synced', draw); on('trade', () => setTimeout(draw, 500));
+on('mode', draw); on('strength', draw); on('synced', draw); on('trade', () => setTimeout(draw, 500));
 draw();

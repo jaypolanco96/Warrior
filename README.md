@@ -5,3 +5,4 @@ An impi of six AI agents (scout, shield, spear, smart money, commander, scribe) 
 - Live: https://warrior-liart.vercel.app (deploys from pushes to main)
 - `npm run build` bundles the Solana library and the shared rules into public/vendor
 - `npm test` runs the rule tests
+- `npm run test:browser` builds first, then runs local UI regressions with synthetic Phantom/API responses and isolated browser storage. Install its browser once with `npx playwright-core install chromium`, or set `WARRIOR_BROWSER` to an existing Chromium executable. Optional `WARRIOR_ARTIFACTS` saves review screenshots. This suite never uses real accounts or sends transactions to a chain.
