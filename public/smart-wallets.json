@@ -1,13 +1,12 @@
 {
- "at": "2026-10-21T17:16:55.821Z",
+ "at": "2026-10-21T21:46:38.417Z",
  "coins": 40,
- "pumps": 48,
- "ordinary": 186,
+ "pumps": 76,
+ "ordinary": 222,
  "rule": "bought in the 20 minutes before a +20% pump on 2+ coins, never at an ordinary moment",
  "wallets": [
-  "4ETcnpXZ613FqpoaN53n1wS1cMtJcVk7ZShEef6sQdGE",
-  "9K89bAcXK7RduvvG5HN4YLXh5M5k4mPSRd5nh8NsWkyz",
-  "CnTeYCBA7Hzj9r2s99SaEXKYpiWixtMUkqZWHwyNbm3g",
-  "FykxXnmX3qc9TdqnkUqmh9XfCALkJAsyfRuNXp4wLiWT"
+  "4WWuBXG9xS5gVfky8eonV45eZZZfbaveFvDebzTd5KsZ",
+  "8ub9dD1YgzEiHEh4dEQt9x4RbQJLNrr4WT4pjuQZDTYR",
+  "CnTeYCBA7Hzj9r2s99SaEXKYpiWixtMUkqZWHwyNbm3g"
  ]
 }
