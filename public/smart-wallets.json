@@ -1,15 +1,26 @@
 {
- "at": "2026-10-22T11:59:39.428Z",
+ "at": "2026-10-22T17:15:16.817Z",
  "coins": 40,
- "pumps": 52,
- "ordinary": 154,
+ "pumps": 60,
+ "ordinary": 115,
  "rule": "bought in the 20 minutes before a +20% pump on 2+ coins, never at an ordinary moment",
  "wallets": [
+  "3EmHopkvY6EV6vkk6gyh1g88F8ok84FEux1YheJmgEX5",
+  "3t9yw79VFTWGHYE9Eg2GYM3MztQkuo6BXtrVVajSRx1d",
+  "4AFAUcHL7NoHKJkkRNc7j1jfyW83hPdGknXS7cZPcwFE",
+  "4kJW4MBu24jP5vtiT4ZN3GtNdiT6YVBWzmvw3GWLVqMH",
   "4x5Uti74CuwoM1wRq3gmuMJ3p5qmGNMEbP428Rgb7zTJ",
+  "5aLY85pyxiuX3fd4RgM3Yc1e3MAL6b7UgaZz6MS3JUfG",
+  "5xoQ3xNqvyaB995HK8ktiGFRbCj6wk9Y9iZAGL4tQWCT",
+  "6P6gkNS9xFdRFm5AVUfGotgffq2FFJRyFssLwzqBLoeQ",
   "71pAfN1nJhcLaezSRYvwdsNFE9PnY9hNfcxB4nZ1gdAp",
   "7fV3dWwDm2UNiSjB6YGtjsAePRfMW3N8h8HmozbQHnAy",
-  "9BGTc96yY5Njxw9PzakpfqTgopuTKRCHYE3fsD4o6pPv",
-  "9oq9BpjKxGBomaiEURBXrTVr2rGFiQ8UZzGctPCCKGpW",
+  "ADfZWLuBRTLhiSfE24yntAKCCwRPPRNonVNd5qzP6Pbm",
+  "AJ3pjAESdpE9KubiQZemPYWdC3Q12VwiWdhhFojvKJ8X",
+  "AJ5yRBLuj3orpP1hNs6fZwXPLPcU7HtRzPe52fMQZMwn",
+  "AfHNjAnXJKkQ4yrBDop77A3UaLZgFmGKhaSDZC4Msrvk",
+  "E6sa493zV25c3nxpB35RLriDxAgpuw3DCX5KbtXQU5F8",
+  "EsXTkkmsS4K3ZhcoGfoP72y1j8ujMa3CNNgQRGziGrnh",
   "Go8dMup1rrrAbch8mVzmcUHNmCbUtV8pojuBv87SkQdj"
  ]
 }
