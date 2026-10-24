@@ -21,7 +21,7 @@ export const AGENTS = [
 ];
 export const rules = () => resolveRules({ preset: state.preset, adapt: dials() });
 const heard = {};
-let running = false, starting = false, timer = 0, watcher = 0, last = null, nextAt = 0, rounds = 0, ms = 0;
+let running = false, starting = false, timer = 0, watcher = 0, last = null, nextAt = 0, rounds = 0, ms = 0, shadowAt = 0;
 holdWalletWhile(() => live() && (running || starting));
 export const impi = { get running() { return running; }, get starting() { return starting; }, get lastScan() { return last; }, get nextAt() { return nextAt; }, get rounds() { return rounds; }, get scanMs() { return ms; } };
 const say = (who, text, tone) => emit('say', { who, text, tone });
@@ -74,8 +74,9 @@ async function round() {
     say('umlobi', `Equity ${eq.toFixed(4)} SOL${live() ? '' : ' (practice)'}.`);
   } catch (e) { say('inhloli', `This round could not run (${e.message}). Trying again in a minute; nothing was traded.`, 'down'); }
   finally { lock.busy = false; }
-  // the scorecard: all three strengths, side by side, on pretend money (it never trades)
-  if (running) void shadowRound(Object.keys(dials()).length ? {} : { [state.preset]: last }).catch(() => {});
+  // The side-by-side scorecard scans the other strengths too. Every minute that was three market scans per round,
+  // which burned the hosting allowance while the impi was out. Ten minutes still keeps the comparison current.
+  if (running && Date.now() - shadowAt >= 10 * 60_000) { shadowAt = Date.now(); void shadowRound(Object.keys(dials()).length ? {} : { [state.preset]: last }).catch(() => {}); }
 }
 /** A round with no coin to buy is still decided out loud in the indaba: what was seen, refused, and the nearest misses. */
 function roundTalk(scan, read, R) {

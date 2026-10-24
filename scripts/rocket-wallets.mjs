@@ -28,6 +28,12 @@ for (const c of [...launches.values()].slice(0, 80)) {
 }
 const wallets = [...stats].filter(([, s]) => s.coins >= 2 && s.won >= 2 && s.net > 0).map(([w]) => w).sort();
 if (launches.size < 15 || wallets.length < 10) { console.log(`Only ${launches.size} launches and ${wallets.length} wallets; keeping the previous list.`); process.exit(0); }
-let previous = null; try { previous = JSON.parse(readFileSync(new URL('../public/rocket-wallets.json', import.meta.url), 'utf8')); } catch { /* first run */ }
-writeFileSync(new URL('../public/rocket-wallets.json', import.meta.url), `${JSON.stringify({ at: new Date(now).toISOString(), launches: Math.min(80, launches.size), rule: 'ahead on 2+ pump.fun launches in their first 30 minutes, and ahead overall, over the last 6 hours', wallets }, null, 1)}\n`);
+const file = new URL('../public/rocket-wallets.json', import.meta.url);
+let previous = null; try { previous = JSON.parse(readFileSync(file, 'utf8')); } catch { /* first run */ }
+// The site ignores this list six hours after `at`. The same wallets do not need a new deploy; a timestamp-only
+// commit was rebuilding the whole site every two hours. Refresh before that window closes so a still-valid list stays in use.
+const same = previous && Array.isArray(previous.wallets) && previous.wallets.length === wallets.length && previous.wallets.every((w, i) => w === wallets[i]);
+const age = Number.isFinite(Date.parse(previous?.at)) ? now - Date.parse(previous.at) : Infinity;
+if (same && age < 4 * 3_600_000) { console.log(`Same ${wallets.length} launch wallets, list is ${Math.round(age / 3_600_000)}h old. Not redeploying.`); process.exit(0); }
+writeFileSync(file, `${JSON.stringify({ at: new Date(now).toISOString(), launches: Math.min(80, launches.size), rule: 'ahead on 2+ pump.fun launches in their first 30 minutes, and ahead overall, over the last 6 hours', wallets }, null, 1)}\n`);
 console.log(`${wallets.length} launch wallets from ${Math.min(80, launches.size)} launches${previous ? ` (was ${previous.wallets?.length ?? 0})` : ''}.`);

@@ -4,7 +4,7 @@
 //      a low from which the price rose 20% or more within two hours.
 //   2. Note the wallets that bought in the 20 minutes before each pump, and at ordinary moments (no +10% in two hours).
 //   3. Keep the wallets that bought before pumps on two or more coins and never at an ordinary moment.
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 const SITE = process.env.WARRIOR_SITE || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'https://warrior-liart.vercel.app'), MAX_COINS = Number(process.env.SMART_COINS) || 40;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now();
 const get = async (u) => { for (let i = 0; i < 3; i++) { try { const r = await fetch(u, { signal: AbortSignal.timeout(10000) }); if (r.status === 429) { await sleep(4000 * (i + 1)); continue; } if (r.ok) return await r.json(); } catch { /* retry */ } await sleep(1000); } return null; };
@@ -40,5 +40,11 @@ for (const c of list) {
 }
 const wallets = [...stats].filter(([, s]) => s.coins.size >= 2 && s.calm === 0).map(([w]) => w).sort();
 if (pumpsSeen < 40) { console.log(`Only ${pumpsSeen} pumps found; keeping the previous list.`); process.exit(0); }
-writeFileSync(new URL('../public/smart-wallets.json', import.meta.url), `${JSON.stringify({ at: new Date(now).toISOString(), coins: list.length, pumps: pumpsSeen, ordinary: calmSeen, rule: 'bought in the 20 minutes before a +20% pump on 2+ coins, never at an ordinary moment', wallets }, null, 1)}\n`);
+const file = new URL('../public/smart-wallets.json', import.meta.url);
+let previous = null; try { previous = JSON.parse(readFileSync(file, 'utf8')); } catch { /* first run */ }
+// The site keeps this list for 48 hours. Same wallets do not need a deploy; refresh before that window closes.
+const same = previous && Array.isArray(previous.wallets) && previous.wallets.length === wallets.length && previous.wallets.every((w, i) => w === wallets[i]);
+const age = Number.isFinite(Date.parse(previous?.at)) ? now - Date.parse(previous.at) : Infinity;
+if (same && age < 36 * 3_600_000) { console.log(`Same ${wallets.length} smart wallets, list is ${Math.round(age / 3_600_000)}h old. Not redeploying.`); process.exit(0); }
+writeFileSync(file, `${JSON.stringify({ at: new Date(now).toISOString(), coins: list.length, pumps: pumpsSeen, ordinary: calmSeen, rule: 'bought in the 20 minutes before a +20% pump on 2+ coins, never at an ordinary moment', wallets }, null, 1)}\n`);
 console.log(`${wallets.length} smart wallets from ${pumpsSeen} pumps and ${calmSeen} ordinary moments on ${list.length} coins.`);

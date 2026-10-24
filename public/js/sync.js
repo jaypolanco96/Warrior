@@ -1,5 +1,5 @@
 // Keeps your devices showing the same trading data. Everything is encrypted before it leaves this device (lib/sync.mjs).
-// While the trading wallet is unlocked, every 15 seconds: fetch the other devices' copy, merge it with this one, and save
+// While the trading wallet is unlocked, every 45 seconds: fetch the other devices' copy, merge it with this one, and save
 // back what changed. Only one device at a time may run the auto trader; it claims a three-minute lease and renews it.
 import { vault } from './wallet.js';
 import { on, emit } from './store.js';
@@ -95,7 +95,7 @@ on('vault-locked', () => show('Sync waits while the wallet is locked.'));
 setInterval(() => {
   if (authority && leaseUntil - Date.now() < 90_000) void claimTrading();
   if (authority || document.visibilityState === 'visible') void syncNow();
-}, 15_000);
+}, 45_000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void syncNow(); });
 show(vault.exists ? 'Unlock the trading wallet to sync with your other devices.' : 'Have a trading wallet on another device? Open it here with its passphrase.');
 export const sync = { get note() { return note; }, get device() { return device; } };
