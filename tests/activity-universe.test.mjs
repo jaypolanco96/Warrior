@@ -9,13 +9,14 @@ test('default universe includes mature coverage, deduplicates lists and exposes 
   const pool = { id: SOL, quoteAsset: SOL, chain: 'solana', createdAt: new Date(Date.now() - 86400000).toISOString(), liquidity: 1e6, volume24h: 2e6, baseAsset: { id: MATURE.JUP, symbol: 'JUP', usdPrice: 2, tags: ['major'], stats1h: { buyVolume: 40000, sellVolume: 60000 } } };
   globalThis.fetch = async (url) => {
     urls.push(String(url));
-    const json = String(url).includes('tokens/v2/tag') ? [asset, { ...asset, id: MATURE.BONK, symbol: 'BONK', mcap: 5e6 }, { ...asset, id: MATURE.WIF, symbol: 'WIF', isVerified: false, tags: [] }, { ...asset, id: MATURE.RAY, symbol: 'RAY', tags: ['verified', 'stocks'] }, { ...asset, id: MATURE.ORCA, symbol: 'WBTC' }, { ...asset, id: MATURE.PYTH, symbol: 'sUSDai' }, { ...asset, id: MATURE.POPCAT, symbol: 'JLP' }, { ...asset, id: MATURE.JTO, symbol: 'QUIET', stats24h: { buyVolume: 1000, sellVolume: 1000 } }] : String(url).includes('/charts/') ? { candles: Array.from({ length: 200 }, (_, i) => ({ time: Math.floor(Date.now() / 300000) * 300 - (200 - i) * 300, open: 2, high: 2.1, low: 1.9, close: 2, volume: 1000 })) } : String(url).includes('smart-wallets.json') ? {} : String(url).includes('/gems') ? { recent: { pools: [pool] } } : String(url).includes('datapi.jup.ag') ? { pools: [pool] } : String(url).includes('dexscreener') ? [] : { data: [] };
+    const json = String(url).includes('tokens/v2/search') ? [asset] : String(url).includes('tokens/v2/tag') ? [asset, { ...asset, id: MATURE.BONK, symbol: 'BONK', mcap: 5e6 }, { ...asset, id: MATURE.WIF, symbol: 'WIF', isVerified: false, tags: [] }, { ...asset, id: MATURE.RAY, symbol: 'RAY', tags: ['verified', 'stocks'] }, { ...asset, id: MATURE.ORCA, symbol: 'WBTC' }, { ...asset, id: MATURE.PYTH, symbol: 'sUSDai' }, { ...asset, id: MATURE.POPCAT, symbol: 'JLP' }, { ...asset, id: MATURE.JTO, symbol: 'QUIET', stats24h: { buyVolume: 1000, sellVolume: 1000 } }] : String(url).includes('/charts/') ? { candles: Array.from({ length: 200 }, (_, i) => ({ time: Math.floor(Date.now() / 300000) * 300 - (200 - i) * 300, open: 2, high: 2.1, low: 1.9, close: 2, volume: 1000 })) } : String(url).includes('smart-wallets.json') ? {} : String(url).includes('/gems') ? { recent: { pools: [pool] } } : String(url).includes('datapi.jup.ag') ? { pools: [pool] } : String(url).includes('dexscreener') ? [] : { data: [] };
     return { ok: true, json: async () => json };
   };
   try {
     const all = await universe();
     assert.equal(all.sourcesFailed, 0); assert.equal(all.tokens.length, 1);
     assert.equal(all.tokens[0].mature, true); assert.equal(all.tokens[0].activity.turnoverUsd, 100000);
+    assert.equal(urls.filter(u => u.includes('tokens/v2/tag')).length, 1, 'the heavy list is not reread on each scan');
     assert.ok(!urls.some(u => u.includes('/gems') || u.includes('geckoterminal')), 'launch and meme feeds are not part of the universe');
     const restricted = await universe({ mature: false });
     assert.equal(restricted.tokens.length, 0);
