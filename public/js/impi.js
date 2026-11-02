@@ -12,7 +12,7 @@ import { shadowRound } from './shadow.js';
 import { weatherFactor, weather } from './watch.js';
 
 export const AGENTS = [
-  { id: 'inhloli', name: 'Inhloli', glyph: '👁', role: 'scout', job: 'Watches Solana meme and ecosystem coins; keeps only the busy ones.' },
+  { id: 'inhloli', name: 'Inhloli', glyph: '👁', role: 'scout', job: 'Watches verified SOL economy coins worth $10M or more; keeps only the busy ones.' },
   { id: 'isihlangu', name: 'Isihlangu', glyph: '🛡', role: 'shield', job: 'Refuses rugs: freeze or mint powers, thin pools, bundled-buy farms, staged launches.' },
   { id: 'umkhonto', name: 'Umkhonto', glyph: '⚔', role: 'spear', job: 'Strikes only on the tested deep dip: RSI 35 or less, 8–10% under the average, on a busy coin.' },
   { id: 'izinyoni', name: 'Izinyoni', glyph: '🐦', role: 'smart money', job: 'Watches wallets with a record of buying before pumps.' },

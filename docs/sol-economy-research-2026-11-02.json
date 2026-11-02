@@ -1,0 +1,323 @@
+{
+ "rep": {
+  "F1": {
+   "train": {
+    "n": 144,
+    "mean": 3.81,
+    "med": 11.16,
+    "win": 74,
+    "pf": 1.85,
+    "xb2": 3.7,
+    "coins": 40
+   },
+   "val": {
+    "n": 64,
+    "mean": 3.79,
+    "med": 11.16,
+    "win": 73,
+    "pf": 1.9,
+    "xb2": 3.55,
+    "coins": 25
+   },
+   "hold": {
+    "n": 23,
+    "mean": 2.87,
+    "med": 11.16,
+    "win": 74,
+    "pf": 1.53,
+    "xb2": 2.09,
+    "coins": 10
+   },
+   "hold3": {
+    "n": 23,
+    "mean": 2.1,
+    "med": 10.32,
+    "win": 74,
+    "pf": 1.38,
+    "xb2": 1.31,
+    "coins": 10
+   },
+   "b0": {
+    "n": 13,
+    "mean": -1.06,
+    "med": 11.16,
+    "win": 62,
+    "pf": 0.87,
+    "xb2": -3.28,
+    "coins": 6
+   },
+   "b1": {
+    "n": 10,
+    "mean": 7.98,
+    "med": 11.16,
+    "win": 90,
+    "pf": 4.88,
+    "xb2": 7.19,
+    "coins": 4
+   },
+   "ctrl": {
+    "n": 170,
+    "mean": -3.26,
+    "med": -4.42,
+    "win": 39,
+    "pf": 0.54,
+    "xb2": -3.43,
+    "coins": 46
+   },
+   "why": {
+    "target": 17,
+    "stop": 6
+   },
+   "portHold": {
+    "end": 1.066,
+    "maxDD": 5,
+    "skipped": 0
+   },
+   "portAll": {
+    "end": 1.918,
+    "maxDD": 5.8,
+    "skipped": 41
+   },
+   "worst": [
+    "ZCAT:-20.6",
+    "BIRB:-20.6",
+    "MASK:-20.6"
+   ],
+   "pass": {
+    "n": false,
+    "mean": true,
+    "med": true,
+    "win": true,
+    "pf": true,
+    "cost3": true,
+    "xb2": true,
+    "buckets": false,
+    "ctrl": true,
+    "cur": true,
+    "coins": true,
+    "tv": true
+   },
+   "PASSED": false
+  },
+  "F2": {
+   "train": {
+    "n": 112,
+    "mean": 3.28,
+    "med": 11.16,
+    "win": 72,
+    "pf": 1.69,
+    "xb2": 3.14,
+    "coins": 37
+   },
+   "val": {
+    "n": 38,
+    "mean": 5.62,
+    "med": 11.16,
+    "win": 82,
+    "pf": 2.75,
+    "xb2": 5.31,
+    "coins": 18
+   },
+   "hold": {
+    "n": 3,
+    "mean": -10.01,
+    "med": -20.6,
+    "win": 33,
+    "pf": 0.27,
+    "xb2": -20.6,
+    "coins": 3
+   },
+   "hold3": {
+    "n": 3,
+    "mean": -10.69,
+    "med": -21.2,
+    "win": 33,
+    "pf": 0.24,
+    "xb2": -21.2,
+    "coins": 3
+   },
+   "b0": {
+    "n": 3,
+    "mean": -10.01,
+    "med": -20.6,
+    "win": 33,
+    "pf": 0.27,
+    "xb2": -20.6,
+    "coins": 3
+   },
+   "b1": {
+    "n": 0,
+    "mean": 0,
+    "med": 0,
+    "win": 0,
+    "pf": 0,
+    "xb2": 0,
+    "coins": 0
+   },
+   "ctrl": {
+    "n": 170,
+    "mean": -3.26,
+    "med": -4.42,
+    "win": 39,
+    "pf": 0.54,
+    "xb2": -3.43,
+    "coins": 46
+   },
+   "why": {
+    "stop": 2,
+    "target": 1
+   },
+   "portHold": {
+    "end": 0.97,
+    "maxDD": 0,
+    "skipped": 0
+   },
+   "portAll": {
+    "end": 1.469,
+    "maxDD": 6.7,
+    "skipped": 25
+   },
+   "worst": [
+    "ZCAT:-20.6",
+    "SI:-20.6",
+    "BIRB:11.2"
+   ],
+   "pass": {
+    "n": false,
+    "mean": false,
+    "med": false,
+    "win": false,
+    "pf": false,
+    "cost3": false,
+    "xb2": false,
+    "buckets": false,
+    "ctrl": false,
+    "cur": false,
+    "coins": false,
+    "tv": true
+   },
+   "PASSED": false
+  },
+  "F3": {
+   "train": {
+    "n": 46,
+    "mean": 3.01,
+    "med": 7.19,
+    "win": 78,
+    "pf": 2.15,
+    "xb2": 2.82,
+    "coins": 24
+   },
+   "val": {
+    "n": 34,
+    "mean": 2.44,
+    "med": 7.19,
+    "win": 74,
+    "pf": 1.9,
+    "xb2": 2.14,
+    "coins": 24
+   },
+   "hold": {
+    "n": 17,
+    "mean": 2.75,
+    "med": 7.19,
+    "win": 76,
+    "pf": 2.31,
+    "xb2": 2.16,
+    "coins": 14
+   },
+   "hold3": {
+    "n": 17,
+    "mean": -0.49,
+    "med": 6.38,
+    "win": 65,
+    "pf": 0.89,
+    "xb2": -1.4,
+    "coins": 14
+   },
+   "b0": {
+    "n": 8,
+    "mean": 5.81,
+    "med": 7.19,
+    "win": 100,
+    "pf": 99,
+    "xb2": 5.34,
+    "coins": 7
+   },
+   "b1": {
+    "n": 9,
+    "mean": 0.03,
+    "med": 7.19,
+    "win": 56,
+    "pf": 1.01,
+    "xb2": -2.01,
+    "coins": 7
+   },
+   "ctrl": {
+    "n": 301,
+    "mean": -2.21,
+    "med": -1.75,
+    "win": 42,
+    "pf": 0.54,
+    "xb2": -2.27,
+    "coins": 47
+   },
+   "why": {
+    "target": 11,
+    "stop": 2,
+    "time": 4
+   },
+   "portHold": {
+    "end": 1.076,
+    "maxDD": 2.1,
+    "skipped": 2
+   },
+   "portAll": {
+    "end": 1.44,
+    "maxDD": 4.4,
+    "skipped": 2
+   },
+   "worst": [
+    "USELESS:-15.6",
+    "ANSEM:-15.6",
+    "ORE:-3.7"
+   ],
+   "pass": {
+    "n": false,
+    "mean": true,
+    "med": true,
+    "win": true,
+    "pf": true,
+    "cost3": false,
+    "xb2": true,
+    "buckets": true,
+    "ctrl": true,
+    "cur": true,
+    "coins": true,
+    "tv": true
+   },
+   "PASSED": false
+  }
+ },
+ "cur": {
+  "0.015": {
+   "n": 15,
+   "mean": 0.66,
+   "med": 2.81,
+   "win": 67,
+   "pf": 1.17,
+   "xb2": -1.85,
+   "coins": 10
+  },
+  "0.03": {
+   "n": 15,
+   "mean": -0.92,
+   "med": 1.43,
+   "win": 53,
+   "pf": 0.8,
+   "xb2": -3.41,
+   "coins": 10
+  }
+ },
+ "END": 1793643300000
+}

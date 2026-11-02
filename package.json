@@ -3,7 +3,7 @@
   "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Warrior: an impi of six AI agents trading Solana meme and ecosystem coins with tested rules. No profit is promised.",
+  "description": "Warrior: an impi of six AI agents trading established SOL economy coins with tested rules. No profit is promised.",
   "engines": {
     "node": ">=22"
   },
